@@ -1,85 +1,68 @@
 package edu.utdallas.cs5390.chat.server;
 
 import edu.utdallas.cs5390.chat.CLIReader;
-import edu.utdallas.cs5390.chat.server.listeners.ServerTCPListener;
-import edu.utdallas.cs5390.chat.util.Utils;
+import edu.utdallas.cs5390.chat.server.processor.ClientMessageProcessor;
+import edu.utdallas.cs5390.chat.server.service.ClientMessagingService;
+import edu.utdallas.cs5390.chat.server.service.ClientProfile;
+import edu.utdallas.cs5390.chat.server.service.tcp.TCPWelcomeService;
+import edu.utdallas.cs5390.chat.server.processor.RegisterProcessor;
+import edu.utdallas.cs5390.chat.server.service.udp.UDPConnectionService;
 
-import java.io.*;
-import java.net.*;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.net.Socket;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Created by Adisor on 10/1/2016.
  */
 
-// TODO: do proper udp processing, and organize the code
-public class ChatServer extends Thread {
-    private static final int SOCKET_WAIT_TIMEOUT = Utils.seconds(1);
-    private static final int UDP_PORT = 8080;
-    private static final int TCP_PORT = 8081;
-
-    private ServerSocket serverSocket;
-    private DatagramSocket datagramSocket;
+// need to work on the tables for this class
+public class ChatServer {
+    private Map<String, ClientProfile> clientProfiles;
+    private Map<String, String> usernameIPTable;
+    private Map<String, ClientMessagingService> clientMessagingServices;
+    private TCPWelcomeService tcpWelcomeService;
+    private UDPConnectionService udpConnectionService;
     private ExecutorService executorService;
-    private Map<String, ClientProfile> clientProfileMap;
-    private List<ClientService> clients;
-    private boolean shutdown;
 
     public ChatServer() throws IOException {
+        clientProfiles = new HashMap<String, ClientProfile>();
+        clientMessagingServices = new HashMap<String, ClientMessagingService>();
+        tcpWelcomeService = new TCPWelcomeService(this);
+        udpConnectionService = new UDPConnectionService();
+        udpConnectionService.addPacketListener(new RegisterProcessor(this));
         executorService = Executors.newFixedThreadPool(5);
-        clients = new ArrayList<ClientService>();
-        clientProfileMap = new HashMap<String, ClientProfile>();
-        datagramSocket = new DatagramSocket(UDP_PORT);
-        serverSocket = new ServerSocket(TCP_PORT);
-        serverSocket.setSoTimeout(SOCKET_WAIT_TIMEOUT);
     }
 
-    public void run() {
-        while (!shutdown)
-            processTCPConnections();
+    private void startup() throws IOException {
+        tcpWelcomeService.start();
+        udpConnectionService.start();
     }
 
-    private void processTCPConnections() {
-        try {
-            Socket clientSocket = serverSocket.accept();
-            ClientService clientService = new ClientService(clientSocket);
-            clientService.addMessageListener(new ServerTCPListener(this));
-            clients.add(clientService);
-            executorService.execute(clientService);
-        } catch (IOException ignored) {
-        }
+    public ClientMessagingService getClientMessagingService(String userID) {
+        return clientMessagingServices.get(userID);
     }
 
-    private void processUDPConnections() {
-        DatagramPacket datagramPacket = new DatagramPacket(new byte[256], 256);
-        try {
-            datagramSocket.receive(datagramPacket);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public void serviceClient(Socket clientSocket) throws IOException {
+        ClientMessagingService clientMessagingService = new ClientMessagingService(clientSocket);
+        clientMessagingServices.put("username", clientMessagingService);
+        clientMessagingService.addMessageProcessor(new ClientMessageProcessor(this));
+        executorService.execute(clientMessagingService);
     }
 
-    public void shutdown() {
-        shutdown = true;
-        for (ClientService clientService : clients) {
-            clientService.close();
-        }
-        if (datagramSocket != null)
-            datagramSocket.close();
-        if (serverSocket != null)
-            try {
-                serverSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+    public void logOffUser(String userID){
+        ClientMessagingService clientMessagingService = clientMessagingServices.remove(userID);
+        clientMessagingService.close();
     }
 
-    public Map<String, ClientProfile> getClientProfileMap() {
-        return clientProfileMap;
+    private void shutdown() {
+        for (ClientMessagingService clientMessagingService : clientMessagingServices.values())
+            clientMessagingService.close();
+        tcpWelcomeService.close();
+        udpConnectionService.close();
     }
 
     public static void main(String[] args) {
@@ -89,8 +72,8 @@ public class ChatServer extends Thread {
             CLIReader cliReader = new CLIReader();
             String command = "";
 
-            // run
-            chatServer.start();
+            // startup
+            chatServer.startup();
             while (!command.equals("exit")) {
                 command = cliReader.getNextCommand();
             }
@@ -101,12 +84,5 @@ public class ChatServer extends Thread {
         }
     }
 
-    class UDPServer {
-        public UDPServer() {
-        }
-    }
 
-    class TCPServer {
-
-    }
 }

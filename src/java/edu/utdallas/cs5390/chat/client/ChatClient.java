@@ -58,6 +58,7 @@ public class ChatClient {
         cliReader.close();
     }
 
+    // TODO: HERE WE SHOULD ADD LISTENER/PROCESSOR INTERFACE PATTERNS
     public void run() {
         String command = "";
         while (!command.equals("EXIT")) {
