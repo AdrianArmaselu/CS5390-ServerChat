@@ -13,7 +13,7 @@ import java.util.List;
  */
 
 // should move socket away from here
-public class ClientMessagingService implements Runnable {
+public class ClientMessagingService implements Runnable, AbstractClientMessagingService {
     private boolean stop;
     private Socket clientSocket;
     private BufferedReader bufferedReader;

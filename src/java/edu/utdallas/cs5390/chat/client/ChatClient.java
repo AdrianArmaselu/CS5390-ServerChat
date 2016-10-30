@@ -43,9 +43,7 @@ public class ChatClient {
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
-
         cliReader = new CLIReader();
-
     }
 
     public void shutdown() {
@@ -60,15 +58,20 @@ public class ChatClient {
 
     // TODO: HERE WE SHOULD ADD LISTENER/PROCESSOR INTERFACE PATTERNS
     public void run() {
+        String id = "adrian";
         String command = "";
         while (!command.equals("EXIT")) {
             command = cliReader.getNextCommand();
             if (command.equals("Log on"))
                 try {
-                    String response = udpConnection.sendMessageAndGetResponse("hello");
+                    String response = udpConnection.sendMessageAndGetResponse("HELLO(" + id + ")");
+
                 } catch (TransmissionException e) {
                     e.printStackTrace();
                 }
+            if(command.){
+
+            }
         }
         shutdown();
     }

@@ -22,7 +22,7 @@ public class UDPConnectionService extends Thread {
     private DatagramSocket datagramSocket;
 
     public UDPConnectionService() throws SocketException {
-        packetListeners = new ArrayList<PacketProcessor>();
+        packetListeners = new ArrayList<>();
         datagramSocket = new DatagramSocket(UDP_PORT);
         datagramSocket.setSoTimeout(SOCKET_WAIT_TIMEOUT);
     }
