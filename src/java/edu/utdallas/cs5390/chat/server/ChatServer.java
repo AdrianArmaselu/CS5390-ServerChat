@@ -1,11 +1,8 @@
 package edu.utdallas.cs5390.chat.server;
 
 import edu.utdallas.cs5390.chat.CLIReader;
-import edu.utdallas.cs5390.chat.server.processor.ClientMessageProcessor;
 import edu.utdallas.cs5390.chat.server.service.ClientMessagingService;
-import edu.utdallas.cs5390.chat.server.service.ClientProfile;
 import edu.utdallas.cs5390.chat.server.service.tcp.TCPWelcomeService;
-import edu.utdallas.cs5390.chat.server.processor.RegisterProcessor;
 import edu.utdallas.cs5390.chat.server.service.udp.UDPConnectionService;
 
 import java.io.IOException;
@@ -20,7 +17,7 @@ import java.util.concurrent.Executors;
  */
 
 // need to work on the tables for this class
-public class ChatServer {
+public class ChatServer implements AbstractChatServer {
     private Map<String, ClientMessagingService> clientMessagingServices;
     private TCPWelcomeService tcpWelcomeService;
     private UDPConnectionService udpConnectionService;
@@ -30,7 +27,6 @@ public class ChatServer {
         clientMessagingServices = new HashMap<>();
         tcpWelcomeService = new TCPWelcomeService(this);
         udpConnectionService = new UDPConnectionService();
-        udpConnectionService.addPacketListener(new RegisterProcessor(this));
         executorService = Executors.newFixedThreadPool(5);
     }
 
@@ -45,7 +41,6 @@ public class ChatServer {
     public void serviceClient(Socket clientSocket) throws IOException {
         ClientMessagingService clientMessagingService = new ClientMessagingService(clientSocket);
         clientMessagingServices.put("username", clientMessagingService);
-        clientMessagingService.addMessageProcessor(new ClientMessageProcessor(this));
         executorService.execute(clientMessagingService);
     }
 
@@ -70,7 +65,7 @@ public class ChatServer {
             // startup
             chatServer.startup();
             while (!command.equals("exit")) {
-                command = cliReader.getNextCommand();
+                command = cliReader.readInput();
             }
             chatServer.shutdown();
             System.exit(0);

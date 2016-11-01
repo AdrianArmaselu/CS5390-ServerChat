@@ -20,7 +20,7 @@ public class CLIReader {
         bufferedReader = new BufferedReader(new InputStreamReader(System.in));
     }
 
-    public String getNextCommand() {
+    public String readInput() {
         try {
             return bufferedReader.readLine();
         } catch (IOException e) {

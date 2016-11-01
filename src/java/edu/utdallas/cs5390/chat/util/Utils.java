@@ -1,12 +1,27 @@
 package edu.utdallas.cs5390.chat.util;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigInteger;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /**
  * Created by Adisor on 10/1/2016.
  */
 public class Utils {
+
+    public static final String MD5 = "MD5";
+    public static final String SHA2516 = "SHA-256";
+
+    public static String CIPHER_INSTANCE_TYPE = "AES";
+
 
     public static int seconds(int seconds) {
         return seconds * 1000;
@@ -27,5 +42,17 @@ public class Utils {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+    }
+
+    public static String createHash(MessageDigest messageDigest, String code) {
+        messageDigest.update(code.getBytes(), 0, code.length());
+        return new BigInteger(1, messageDigest.digest()).toString(16);
+    }
+
+    public static String cipherMessage(Key key, int cipherMode, String message) throws BadPaddingException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+        Cipher decipher = Cipher.getInstance(CIPHER_INSTANCE_TYPE);
+        decipher.init(cipherMode, key);
+        byte[] decryptedResponseBytes = decipher.doFinal(message.getBytes());
+        return new String(decryptedResponseBytes);
     }
 }
