@@ -28,6 +28,7 @@ public class UDPConnectionService extends Thread {
     private static final int SOCKET_WAIT_TIMEOUT = Utils.seconds(1);
     private static final int PACKET_BUFFER_SIZE = Utils.kilobytes(1);
     private static final int UDP_PORT = 8080;
+    private static final int RAND_SIZE = 4;
 
     private DatagramSocket datagramSocket;
     private AbstractChatServer chatServer;
@@ -84,6 +85,7 @@ public class UDPConnectionService extends Thread {
                 authenticateClient(message, ipAddress);
             if(ProtocolIncomingMessages.isRegisteredMessage(message))
                 registerClient(message, ipAddress);
+            if(ProtocolIncomingMessages.isChatStart);
             // ADD CHAT START
             // ADD END CHAT
             // ADD LOGOFF
@@ -93,12 +95,11 @@ public class UDPConnectionService extends Thread {
     private void logonClient(String message, String ipAddress) {
         String username = ProtocolIncomingMessages.extractUsername(message);
         if (chatServer.isASubscriber(username)) {
-            String secretKey = chatServer.getUserSecretKey(username);
             chatServer.setId(username, ipAddress);
-            chatServer.generateRand(username);
-            String randomString = "uselib";
+            String rand = Utils.randomString(RAND_SIZE);
+            chatServer.saveRand(username, rand);
             try {
-                sendMessage(ProtocolOutgoingMessages.CHALLENGE(randomString));
+                sendMessage(ProtocolOutgoingMessages.CHALLENGE(rand));
             } catch (IOException e) {
                 e.printStackTrace();
             }

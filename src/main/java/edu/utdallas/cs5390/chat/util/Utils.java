@@ -1,5 +1,7 @@
 package edu.utdallas.cs5390.chat.util;
 
+import org.apache.commons.lang3.RandomStringUtils;
+
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -42,6 +44,14 @@ public class Utils {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+    }
+
+    public static String UUID(){
+        return String.valueOf(java.util.UUID.randomUUID());
+    }
+
+    public static String randomString(int size) {
+        return RandomStringUtils.random(size, true, true);
     }
 
     public static String createHash(MessageDigest messageDigest, String code) {

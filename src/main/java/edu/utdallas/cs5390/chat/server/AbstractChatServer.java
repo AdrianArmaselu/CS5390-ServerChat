@@ -18,5 +18,5 @@ public interface AbstractChatServer {
 
     String getRand(String username);
 
-    void generateRand(String username);
+    void saveRand(String username, String rand);
 }
