@@ -69,7 +69,7 @@ public class UDPConnectionService extends Thread {
     }
 
     public void run() {
-        while(!isInterrupted()) {
+        while (!isInterrupted()) {
             DatagramPacket incomingPacket;
             try {
                 incomingPacket = receivePacket();
@@ -83,12 +83,8 @@ public class UDPConnectionService extends Thread {
                 logonClient(message, ipAddress);
             if (ProtocolIncomingMessages.isResponseMessage(message))
                 authenticateClient(message, ipAddress);
-            if(ProtocolIncomingMessages.isRegisteredMessage(message))
-                registerClient(message, ipAddress);
-            if(ProtocolIncomingMessages.isChatStart);
-            // ADD CHAT START
-            // ADD END CHAT
-            // ADD LOGOFF
+            if (ProtocolIncomingMessages.isRegisteredMessage(message))
+                registerClient(ipAddress);
         }
     }
 
@@ -109,21 +105,12 @@ public class UDPConnectionService extends Thread {
     private void authenticateClient(String message, String ipAddress) {
         String res = ProtocolIncomingMessages.extractRes(message);
         String username = chatServer.getUsername(ipAddress);
-        encryptionKey = new SecretKeySpec(res.getBytes(), 0, 16, "AES");
-        if (chatServer.hasMatchingCipherKey(username, res)) {
-            try {
-                String cipherKey = Utils.createHash(MessageDigest.getInstance(Utils.SHA2516), chatServer.getRand(username) + chatServer.getUserSecretKey(username));
-                sendEncryptedMessage(ProtocolOutgoingMessages.AUTH_SUCCESS);
-            } catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
-            }
-        }
-        else
-            sendEncryptedMessage(ProtocolOutgoingMessages.AUTH_FAIL);
+        encryptionKey = chatServer.generateEncryptionKey();
+        sendEncryptedMessage(chatServer.hasMatchingCipherKey(username, res) ? ProtocolOutgoingMessages.AUTH_SUCCESS : ProtocolOutgoingMessages.AUTH_FAIL);
     }
 
-    private void registerClient(String message, String ipAddress){
-
+    private void registerClient(String ipAddress) {
+        chatServer.acceptTCPConnectionFromUser(chatServer.getUsername(ipAddress)); // add to blockingqueue
     }
 
     public void close() {

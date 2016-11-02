@@ -5,7 +5,7 @@ package edu.utdallas.cs5390.chat.server.protocol;
  */
 public class ProtocolIncomingMessages {
 
-    public static boolean isHelloMessage(String message){
+    public static boolean isHelloMessage(String message) {
         return message.startsWith("HELLO");
     }
 
@@ -17,6 +17,10 @@ public class ProtocolIncomingMessages {
         return message.startsWith("REGISTER");
     }
 
+    public static boolean isConnectMessage(String message) {
+        return message.startsWith("CONNECT");
+    }
+
     public static String extractUsername(String message) {
         return extractValue(message);
     }
@@ -25,7 +29,7 @@ public class ProtocolIncomingMessages {
         return extractValue(message);
     }
 
-    private static String extractValue(String message){
+    private static String extractValue(String message) {
         return message.substring(message.indexOf("(") + 1, message.lastIndexOf(")"));
     }
 }

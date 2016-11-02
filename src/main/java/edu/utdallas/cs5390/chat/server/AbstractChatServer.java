@@ -1,6 +1,7 @@
 package edu.utdallas.cs5390.chat.server;
 
 import java.net.InetAddress;
+import java.security.Key;
 
 /**
  * Created by aarmaselu on 10/11/2016.
@@ -19,4 +20,8 @@ public interface AbstractChatServer {
     String getRand(String username);
 
     void saveRand(String username, String rand);
+
+    Key generateEncryptionKey();
+
+    void acceptTCPConnectionFromUser(String username);
 }

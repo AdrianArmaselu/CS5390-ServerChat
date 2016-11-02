@@ -10,7 +10,7 @@ import java.io.IOException;
  */
 public abstract class AbstractClientConnection {
     private static final int MAX_RETRIES = 3;
-    static final int RECEIVE_TIMEOUT = Utils.seconds(1);
+    static final int RECEIVE_TIMEOUT = 100;
 
     public String sendMessageAndGetResponse(String message) throws TransmissionException {
         String response = null;

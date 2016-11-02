@@ -20,7 +20,7 @@ import java.security.NoSuchAlgorithmException;
 public class Utils {
 
     public static final String MD5 = "MD5";
-    public static final String SHA2516 = "SHA-256";
+    public static final String SHA256 = "SHA-256";
 
     public static String CIPHER_INSTANCE_TYPE = "AES";
 

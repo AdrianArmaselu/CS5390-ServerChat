@@ -32,7 +32,7 @@ public class LogonProtocol implements ClientProtocol {
         String password = chatClient.getPassword();
         String response = udpConnection.sendMessageAndGetResponse(username);
         String rand = response.substring(response.indexOf(":") + 1);
-        String cipherKey = Utils.createHash(MessageDigest.getInstance(Utils.SHA2516), rand + password);
+        String cipherKey = Utils.createHash(MessageDigest.getInstance(Utils.SHA256), rand + password);
         secretKey = new SecretKeySpec(cipherKey.getBytes(), 0, 16, "AES");
         response = udpConnection.sendMessageAndGetResponse("key:" + cipherKey);
         response = Utils.cipherMessage(secretKey, Cipher.DECRYPT_MODE, response);

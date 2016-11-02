@@ -4,7 +4,10 @@ import edu.utdallas.cs5390.chat.client.connection.EncryptedTCPClientConnection;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -41,7 +44,7 @@ public class ClientMessagingService extends Thread {
     void sendMessage() {
         try {
             clientConnection.sendMessage(outgoingMessages.poll());
-        } catch (IOException | BadPaddingException | IllegalBlockSizeException e) {
+        } catch (IOException | BadPaddingException | IllegalBlockSizeException | NoSuchPaddingException | InvalidKeyException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
     }
@@ -55,7 +58,7 @@ public class ClientMessagingService extends Thread {
         try {
             receivedMessage = clientConnection.receiveMessage();
             System.out.println(receivedMessage);
-        } catch (IOException | BadPaddingException | IllegalBlockSizeException e) {
+        } catch (IOException | BadPaddingException | IllegalBlockSizeException | NoSuchPaddingException | InvalidKeyException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
         return receivedMessage;
