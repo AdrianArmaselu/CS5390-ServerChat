@@ -1,54 +1,44 @@
 package edu.utdallas.cs5390.chat.client;
 
-import edu.utdallas.cs5390.chat.CLIReader;
-import edu.utdallas.cs5390.chat.client.protocol.messages.ProtocolInputCommands;
-import edu.utdallas.cs5390.chat.client.connection.EncryptedTCPClientConnection;
-import edu.utdallas.cs5390.chat.client.connection.UDPClientConnection;
-import edu.utdallas.cs5390.chat.client.protocol.ClientProtocol;
-import edu.utdallas.cs5390.chat.client.protocol.EndChatProtocol;
-import edu.utdallas.cs5390.chat.client.protocol.LogonProtocol;
-import edu.utdallas.cs5390.chat.client.protocol.StartChatProtocol;
+import com.beust.jcommander.JCommander;
+import edu.utdallas.cs5390.chat.client.protocol.CommandsProtocol;
+import edu.utdallas.cs5390.chat.common.ContextualProtocol;
+import edu.utdallas.cs5390.chat.common.connection.udp.UDPConnection;
+import edu.utdallas.cs5390.chat.common.service.TCPMessagingService;
+import edu.utdallas.cs5390.chat.common.util.CLIReader;
 
+import java.io.IOException;
+import java.net.Socket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.security.Key;
 
 /**
  * Created by Adisor on 10/1/2016.
  */
 
 // TODO: COMMUNICATE AVAILABLE COMMANDS BACK TO THE USER
-// TODO: PUT THE CLI CODE IN A DISPATCHER CLASS
-
 public class ChatClient implements AbstractChatClient {
-    // target host
-    private static final String HOST_ADDRESS = "127.0.0.1";
-    private static final int HOST_PORT = 8080;
-    private UDPClientConnection udpConnection;
-    private EncryptedTCPClientConnection tcpConnection;
+    private ChatClientArguments chatClientArguments;
+    private UDPConnection udpConnection;
     private CLIReader cliReader;
+    private final CommandsProtocol commandsProtocol;
+    private TCPMessagingService tcpMessagingService;
 
-    private String username = "student";
-    private String password = "student";
+    private boolean isInChatSession;
 
-    private ClientProtocol logonProtocol;
-    private ClientProtocol startChatProtocol;
-    private ClientProtocol endChatProtocol;
-
-    private ClientMessagingService clientMessagingService;
-
-    private boolean isChatStarted;
-
-    public ChatClient() {
-        logonProtocol = new LogonProtocol();
-        startChatProtocol = new StartChatProtocol();
-        endChatProtocol = new EndChatProtocol();
-        clientMessagingService = new ClientMessagingService(this);
-        clientMessagingService.start();
-        try {
-            udpConnection = new UDPClientConnection(HOST_ADDRESS, HOST_PORT);
-        } catch (SocketException e) {
-            e.printStackTrace();
-        }
+    public ChatClient(ChatClientArguments chatClientArguments) throws IOException {
+        tcpMessagingService = new TCPMessagingService();
+        this.chatClientArguments = chatClientArguments;
+        commandsProtocol = new CommandsProtocol(this);
         cliReader = new CLIReader();
+        try {
+            udpConnection = new UDPConnection(chatClientArguments.getServerAddress(), chatClientArguments.getPort());
+        } catch (SocketException | UnknownHostException e) {
+            e.printStackTrace();
+        } finally {
+            shutdown();
+        }
     }
 
     private void run() {
@@ -61,103 +51,91 @@ public class ChatClient implements AbstractChatClient {
     }
 
     private void executeCommand(String message) {
-        switch (message) {
-            case ProtocolInputCommands.LOGON:
-                logon();
-                break;
-            case ProtocolInputCommands.START_CHAT:
-                startChat();
-                break;
-            case ProtocolInputCommands.END_CHAT:
-                endChat();
-                break;
-            case ProtocolInputCommands.LOGOFF:
-                logoff();
-                break;
-            case ProtocolInputCommands.EXIT:
-                shutdown();
-                break;
-            default:
-                if (isChatStarted)
-                    clientMessagingService.addMessage(message);
-                else
-                    System.out.println("Command Not Recognized. Here is a list of available commands: <Needs development>");
-        }
+        commandsProtocol.setContextValue("cli.message", message);
+        commandsProtocol.executeProtocol();
     }
 
-    private void shutdown() {
-        clientMessagingService.shutdown();
-        udpConnection.close();
-        tcpConnection.close();
-        cliReader.close();
+    public void shutdown() {
+        if (tcpMessagingService != null)
+            tcpMessagingService.shutdown();
+        if (udpConnection != null)
+            udpConnection.close();
+        if (cliReader != null)
+            cliReader.close();
         System.exit(0);
     }
 
-    private void logon() {
+    @Override
+    public void addTCPProtocol(ContextualProtocol contextualProtocol) {
+        tcpMessagingService.addCustomProtocol(contextualProtocol);
+    }
+
+    @Override
+    public void startTCPMessagingService(String serverAddress, int serverPort, Key secretKey) {
         try {
-            logonProtocol.executeProtocol(this);
-        } catch (Exception e) {
+            tcpMessagingService.setup(new Socket(serverAddress, serverPort), secretKey);
+            tcpMessagingService.start();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void startChat() {
-        String chatPartnerUsername = cliReader.readInput();
-        try {
-            ((StartChatProtocol) startChatProtocol).setChatPartnerUsername(chatPartnerUsername);
-            startChatProtocol.executeProtocol(this);
-            isChatStarted = true;
-        } catch (Exception e) {
-            e.printStackTrace();
-            isChatStarted = false;
-        }
-    }
-
-    private void endChat() {
-        try {
-            endChatProtocol.executeProtocol(this);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void logoff() {
-        tcpConnection.close();
-    }
-
-    public UDPClientConnection getUdpConnection() {
+    public UDPConnection getUDPConnection() {
         return udpConnection;
     }
 
-    public void setTcpConnection(EncryptedTCPClientConnection tcpConnection) {
-        this.tcpConnection = tcpConnection;
+    @Override
+    public void setIsInChatSession(boolean isInChatSession) {
+        this.isInChatSession = isInChatSession;
     }
 
     @Override
-    public EncryptedTCPClientConnection getTcpConnection() {
-        return tcpConnection;
+    public boolean isInChatSession() {
+        return isInChatSession;
+    }
+
+    @Override
+    public void queueMessage(String message) {
+        tcpMessagingService.queueMessage(message);
+    }
+
+    @Override
+    public String readInput() {
+        return cliReader.readInput();
+    }
+
+    @Override
+    public void logoff() {
+        tcpMessagingService.shutdown();
     }
 
     public String getUsername() {
-        return username;
+        return chatClientArguments.getUsername();
     }
 
     public String getPassword() {
-        return password;
+        return chatClientArguments.getPassword();
     }
 
     @Override
-    public String getHost() {
-        return HOST_ADDRESS;
+    public String getServerAddress() {
+        return chatClientArguments.getServerAddress();
     }
 
     @Override
-    public int getPort() {
-        return HOST_PORT;
+    public int getServerPort() {
+        return chatClientArguments.getPort();
     }
 
     public static void main(String[] args) {
-        ChatClient chatClient = new ChatClient();
-        chatClient.run();
+        ChatClientArguments chatClientArguments = new ChatClientArguments();
+        JCommander jCommander = new JCommander(chatClientArguments);
+        try {
+            jCommander.parse(args);
+            ChatClient chatClient = new ChatClient(chatClientArguments);
+            chatClient.run();
+        } catch (Exception ignored) {
+            jCommander.usage();
+        }
     }
 }

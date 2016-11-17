@@ -1,4 +1,4 @@
-package edu.utdallas.cs5390.chat.util;
+package edu.utdallas.cs5390.chat.common.util;
 
 import org.apache.commons.lang3.RandomStringUtils;
 
@@ -64,5 +64,13 @@ public class Utils {
         decipher.init(cipherMode, key);
         byte[] decryptedResponseBytes = decipher.doFinal(message.getBytes());
         return new String(decryptedResponseBytes);
+    }
+
+    public static String encryptMessage(Key key, String message) throws BadPaddingException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+        return cipherMessage(key, Cipher.ENCRYPT_MODE, message);
+    }
+
+    public static String decryptMessage(Key key, String message) throws IllegalBlockSizeException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException {
+        return cipherMessage(key, Cipher.DECRYPT_MODE, message);
     }
 }

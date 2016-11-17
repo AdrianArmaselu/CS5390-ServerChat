@@ -1,22 +1,22 @@
-package edu.utdallas.cs5390.chat.server.service.udp;
+package edu.utdallas.cs5390.chat.server.service;
 
+import edu.utdallas.cs5390.chat.common.connection.udp.EncryptedUDPMessageSenderSocket;
+import edu.utdallas.cs5390.chat.common.connection.udp.UDPMessageReceiverSocket;
+import edu.utdallas.cs5390.chat.common.connection.udp.UDPMessageSenderSocket;
+import edu.utdallas.cs5390.chat.common.util.Utils;
 import edu.utdallas.cs5390.chat.server.AbstractChatServer;
 import edu.utdallas.cs5390.chat.server.protocol.ProtocolIncomingMessages;
 import edu.utdallas.cs5390.chat.server.protocol.ProtocolOutgoingMessages;
-import edu.utdallas.cs5390.chat.util.Utils;
 
 import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.SocketException;
 import java.security.InvalidKeyException;
 import java.security.Key;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 /**
@@ -24,27 +24,20 @@ import java.security.NoSuchAlgorithmException;
  */
 
 // TODO: NEED TO ANALYZE EXCEPTIONS
-public class UDPConnectionService extends Thread {
-    private static final int SOCKET_WAIT_TIMEOUT = Utils.seconds(1);
-    private static final int PACKET_BUFFER_SIZE = Utils.kilobytes(1);
+public class ServerUDPService extends Thread {
     private static final int UDP_PORT = 8080;
     private static final int RAND_SIZE = 4;
 
-    private DatagramSocket datagramSocket;
     private AbstractChatServer chatServer;
-    private Key encryptionKey;
+    private UDPMessageReceiverSocket receiverSocket;
+    private UDPMessageSenderSocket senderSocket;
+    private EncryptedUDPMessageSenderSocket encryptedSenderSocket;
 
-    public UDPConnectionService(AbstractChatServer chatServer) throws SocketException {
-        datagramSocket = new DatagramSocket(UDP_PORT);
-        datagramSocket.setSoTimeout(SOCKET_WAIT_TIMEOUT);
+    public ServerUDPService(AbstractChatServer chatServer) throws SocketException {
+        receiverSocket = new UDPMessageReceiverSocket(UDP_PORT);
+        senderSocket = new UDPMessageSenderSocket();
+        encryptedSenderSocket = new EncryptedUDPMessageSenderSocket();
         this.chatServer = chatServer;
-    }
-
-    private DatagramPacket receivePacket() throws IOException {
-        byte[] buffer = new byte[PACKET_BUFFER_SIZE];
-        DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length);
-        datagramSocket.receive(datagramPacket);
-        return datagramPacket;
     }
 
     private String extractMessage(DatagramPacket datagramPacket) {
@@ -52,61 +45,56 @@ public class UDPConnectionService extends Thread {
         return new String(messageBytes);
     }
 
-    private String receiveMessage() throws IOException {
-        return extractMessage(receivePacket());
-    }
-
-    private void sendMessage(String message) throws IOException {
-        datagramSocket.send(new DatagramPacket(message.getBytes(), message.length()));
-    }
-
-    private void sendEncryptedMessage(String message) {
-        try {
-            sendMessage(Utils.cipherMessage(encryptionKey, Cipher.ENCRYPT_MODE, message));
-        } catch (BadPaddingException | IllegalBlockSizeException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     public void run() {
         while (!isInterrupted()) {
             DatagramPacket incomingPacket;
             try {
-                incomingPacket = receivePacket();
+                incomingPacket = receiverSocket.receivePacket();
             } catch (IOException e) {
                 e.printStackTrace();
                 continue;
             }
             String message = extractMessage(incomingPacket);
             String ipAddress = incomingPacket.getAddress().getHostAddress();
+            int port = incomingPacket.getPort();
             if (ProtocolIncomingMessages.isHelloMessage(message))
-                logonClient(message, ipAddress);
+                logonClient(message, ipAddress, port);
             if (ProtocolIncomingMessages.isResponseMessage(message))
-                authenticateClient(message, ipAddress);
+                authenticateClient(message, ipAddress, port);
             if (ProtocolIncomingMessages.isRegisteredMessage(message))
                 registerClient(ipAddress);
         }
     }
 
-    private void logonClient(String message, String ipAddress) {
+    private void logonClient(String message, String ipAddress, int port) {
         String username = ProtocolIncomingMessages.extractUsername(message);
         if (chatServer.isASubscriber(username)) {
             chatServer.setId(username, ipAddress);
             String rand = Utils.randomString(RAND_SIZE);
             chatServer.saveRand(username, rand);
             try {
-                sendMessage(ProtocolOutgoingMessages.CHALLENGE(rand));
-            } catch (IOException e) {
+                senderSocket.sendMessage(ProtocolOutgoingMessages.CHALLENGE(rand), InetAddress.getByAddress(ipAddress.getBytes()), port);
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void authenticateClient(String message, String ipAddress) {
+    private void authenticateClient(String message, String ipAddress, int port) {
         String res = ProtocolIncomingMessages.extractRes(message);
         String username = chatServer.getUsername(ipAddress);
-        encryptionKey = chatServer.generateEncryptionKey();
-        sendEncryptedMessage(chatServer.hasMatchingCipherKey(username, res) ? ProtocolOutgoingMessages.AUTH_SUCCESS : ProtocolOutgoingMessages.AUTH_FAIL);
+        Key encryptionKey = chatServer.generateEncryptionKey(username);
+        encryptedSenderSocket.setEncryptionKey(encryptionKey);
+        try {
+            InetAddress clientAddress = InetAddress.getByAddress(ipAddress.getBytes());
+            if (chatServer.hasMatchingRes(username, res)) {
+                encryptedSenderSocket.sendMessage(ProtocolOutgoingMessages.AUTH_SUCCESS, clientAddress, port);
+            } else {
+                encryptedSenderSocket.sendMessage(ProtocolOutgoingMessages.AUTH_FAIL, clientAddress, port);
+            }
+        } catch (IOException | NoSuchPaddingException | InvalidKeyException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
     }
 
     private void registerClient(String ipAddress) {
@@ -114,6 +102,6 @@ public class UDPConnectionService extends Thread {
     }
 
     public void close() {
-        Utils.closeResource(datagramSocket);
+        receiverSocket.close();
     }
 }

@@ -1,14 +1,11 @@
 package edu.utdallas.cs5390.chat.server;
 
-import edu.utdallas.cs5390.chat.CLIReader;
-import edu.utdallas.cs5390.chat.server.service.ClientMessagingService;
-import edu.utdallas.cs5390.chat.server.service.tcp.TCPWelcomeService;
-import edu.utdallas.cs5390.chat.server.service.udp.UDPConnectionService;
+import edu.utdallas.cs5390.chat.common.util.CLIReader;
+import edu.utdallas.cs5390.chat.server.service.ServerUDPService;
+import edu.utdallas.cs5390.chat.server.service.TCPWelcomeService;
 
 import java.io.IOException;
-import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
+import java.security.Key;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -18,15 +15,13 @@ import java.util.concurrent.Executors;
 
 // need to work on the tables for this class
 public class ChatServer implements AbstractChatServer {
-    private Map<String, ClientMessagingService> clientMessagingServices;
     private TCPWelcomeService tcpWelcomeService;
-    private UDPConnectionService udpConnectionService;
+    private ServerUDPService serverUdpService;
     private ExecutorService executorService;
 
     public ChatServer() throws IOException {
-        clientMessagingServices = new HashMap<>();
         tcpWelcomeService = new TCPWelcomeService(this);
-        udpConnectionService = new UDPConnectionService();
+        serverUdpService = new ServerUDPService(this);
         executorService = Executors.newFixedThreadPool(5);
     }
 
@@ -34,25 +29,59 @@ public class ChatServer implements AbstractChatServer {
         tcpWelcomeService.start();
     }
 
-    public ClientMessagingService getClientMessagingService(String userID) {
-        return clientMessagingServices.get(userID);
-    }
-
-    public void serviceClient(Socket clientSocket) throws IOException {
-        ClientMessagingService clientMessagingService = new ClientMessagingService(clientSocket);
-        clientMessagingServices.put("username", clientMessagingService);
-        executorService.execute(clientMessagingService);
-    }
-
-    public void logOffUser(String userID){
-        ClientMessagingService clientMessagingService = clientMessagingServices.remove(userID);
-        clientMessagingService.close();
-    }
-
     private void shutdown() {
-        clientMessagingServices.values().forEach(ClientMessagingService::close);
         tcpWelcomeService.close();
-        udpConnectionService.close();
+        serverUdpService.close();
+    }
+
+    @Override
+    public boolean isASubscriber(String username) {
+        return false;
+    }
+
+    @Override
+    public String getUserSecretKey(String username) {
+        return null;
+    }
+
+    @Override
+    public void setId(String username, String address) {
+
+    }
+
+    @Override
+    public String getUsername(String ipAddress) {
+        return null;
+    }
+
+    @Override
+    public boolean hasMatchingRes(String username, String cipherKey) {
+        return false;
+    }
+
+    @Override
+    public String getRand(String username) {
+        return null;
+    }
+
+    @Override
+    public void saveRand(String username, String rand) {
+
+    }
+
+    @Override
+    public Key generateEncryptionKey(String username) {
+        return null;
+    }
+
+    @Override
+    public void acceptTCPConnectionFromUser(String username) {
+
+    }
+
+    @Override
+    public Key getUserEncryptionKey(String ipAddress) {
+        return null;
     }
 
     public static void main(String[] args) {
@@ -73,4 +102,6 @@ public class ChatServer implements AbstractChatServer {
             e.printStackTrace();
         }
     }
+
+
 }

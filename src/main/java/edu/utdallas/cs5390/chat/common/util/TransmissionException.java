@@ -1,4 +1,4 @@
-package edu.utdallas.cs5390.chat.util;
+package edu.utdallas.cs5390.chat.common.util;
 
 /**
  * Created by Adisor on 10/1/2016.

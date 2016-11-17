@@ -1,6 +1,6 @@
-package edu.utdallas.cs5390.chat;
+package edu.utdallas.cs5390.chat.common.util;
 
-import edu.utdallas.cs5390.chat.util.Utils;
+import edu.utdallas.cs5390.chat.common.util.Utils;
 
 import java.io.BufferedReader;
 import java.io.IOException;

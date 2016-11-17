@@ -1,6 +1,5 @@
 package edu.utdallas.cs5390.chat.server;
 
-import java.net.InetAddress;
 import java.security.Key;
 
 /**
@@ -15,13 +14,15 @@ public interface AbstractChatServer {
 
     String getUsername(String ipAddress);
 
-    boolean hasMatchingCipherKey(String username, String cipherKey);
+    boolean hasMatchingRes(String username, String cipherKey);
 
     String getRand(String username);
 
     void saveRand(String username, String rand);
 
-    Key generateEncryptionKey();
+    Key generateEncryptionKey(String username);
 
     void acceptTCPConnectionFromUser(String username);
+
+    Key getUserEncryptionKey(String ipAddress);
 }
