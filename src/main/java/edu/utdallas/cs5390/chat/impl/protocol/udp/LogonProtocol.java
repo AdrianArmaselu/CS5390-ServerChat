@@ -1,21 +1,19 @@
 package edu.utdallas.cs5390.chat.impl.protocol.udp;
 
 import edu.utdallas.cs5390.chat.framework.client.AbstractChatClient;
-import edu.utdallas.cs5390.chat.impl.messages.ProtocolServerRequests;
-import edu.utdallas.cs5390.chat.impl.messages.ProtocolServerResponses;
 import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
 import edu.utdallas.cs5390.chat.framework.common.connection.udp.UDPConnection;
 import edu.utdallas.cs5390.chat.framework.common.util.TransmissionException;
 import edu.utdallas.cs5390.chat.framework.common.util.Utils;
+import edu.utdallas.cs5390.chat.impl.messages.ProtocolServerRequests;
+import edu.utdallas.cs5390.chat.impl.messages.ProtocolServerResponses;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.SecretKeySpec;
 import java.security.InvalidKeyException;
 import java.security.Key;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 /**
@@ -46,12 +44,12 @@ public class LogonProtocol extends ContextualProtocol {
 
     private String retrieveRand() throws TransmissionException {
         String response = udpConnection.sendMessageAndGetResponse(ProtocolServerRequests.HELLO(chatClient.getUsername()));
-        return ProtocolServerResponses.extractRand(response);
+        return ProtocolServerResponses.extractValue(response);
     }
 
     private String createSecretKey(String rand) throws NoSuchAlgorithmException {
-        String cipherKey = Utils.createHash(MessageDigest.getInstance(Utils.SHA256), rand + chatClient.getPassword());
-        encryptionKey = new SecretKeySpec(cipherKey.getBytes(), 0, 16, "AES");
+        String cipherKey = Utils.createCipherKey(rand, chatClient.getPassword());
+        encryptionKey = Utils.createEncryptionKey(cipherKey);
         return cipherKey;
     }
 

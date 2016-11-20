@@ -6,6 +6,7 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -46,7 +47,7 @@ public class Utils {
             }
     }
 
-    public static String UUID(){
+    public static String UUID() {
         return String.valueOf(java.util.UUID.randomUUID());
     }
 
@@ -72,5 +73,18 @@ public class Utils {
 
     public static String decryptMessage(Key key, String message) throws IllegalBlockSizeException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException {
         return cipherMessage(key, Cipher.DECRYPT_MODE, message);
+    }
+
+    public static String createCipherKey(String rand, String key) throws NoSuchAlgorithmException {
+        return createHash(MessageDigest.getInstance(Utils.SHA256), rand + key);
+    }
+
+    public static Key createEncryptionKey(String cipherKey) {
+        return new SecretKeySpec(cipherKey.getBytes(), 0, 16, "AES");
+    }
+
+    public static Key createEncryptionKey(String rand, String key) throws NoSuchAlgorithmException {
+        String cipherKey = createCipherKey(rand, key);
+        return new SecretKeySpec(cipherKey.getBytes(), 0, 16, "AES");
     }
 }

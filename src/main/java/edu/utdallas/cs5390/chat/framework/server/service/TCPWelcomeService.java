@@ -1,6 +1,5 @@
 package edu.utdallas.cs5390.chat.framework.server.service;
 
-import edu.utdallas.cs5390.chat.framework.common.service.TCPMessagingService;
 import edu.utdallas.cs5390.chat.framework.common.util.Utils;
 import edu.utdallas.cs5390.chat.framework.server.AbstractChatServer;
 import edu.utdallas.cs5390.chat.framework.server.ChatServer;
@@ -27,17 +26,14 @@ public class TCPWelcomeService extends Thread {
     }
 
     public void run() {
-        while (!isInterrupted()) {
+        while (!isInterrupted())
             welcomeClient();
-        }
     }
 
     private void welcomeClient() {
         try {
             Socket clientSocket = serverSocket.accept();
-            TCPMessagingService tcpMessagingService = new TCPMessagingService(clientSocket, chatServer.getUserEncryptionKey(clientSocket.getInetAddress().getHostAddress()));
-            tcpMessagingService.addCustomProtocol();
-            tcpMessagingService.start();
+            chatServer.startSession(clientSocket);
         } catch (IOException ignored) {
         }
     }

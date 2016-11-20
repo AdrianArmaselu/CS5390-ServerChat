@@ -1,11 +1,20 @@
 package edu.utdallas.cs5390.chat.framework.server;
 
+import com.beust.jcommander.JCommander;
+import edu.utdallas.cs5390.chat.framework.common.service.TCPMessagingService;
 import edu.utdallas.cs5390.chat.framework.common.util.CLIReader;
+import edu.utdallas.cs5390.chat.framework.common.util.Utils;
+import edu.utdallas.cs5390.chat.framework.server.service.ClientProfile;
 import edu.utdallas.cs5390.chat.framework.server.service.ServerUDPService;
 import edu.utdallas.cs5390.chat.framework.server.service.TCPWelcomeService;
 
+import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.security.Key;
+import java.io.InputStreamReader;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -13,16 +22,20 @@ import java.util.concurrent.Executors;
  * Created by Adisor on 10/1/2016.
  */
 
-// need to work on the tables for this class
 public class ChatServer implements AbstractChatServer {
     private TCPWelcomeService tcpWelcomeService;
     private ServerUDPService serverUdpService;
     private ExecutorService executorService;
+    private Map<String, ClientProfile> usernameProfiles;
+    private Map<String, ClientProfile> ipProfiles;
 
-    public ChatServer() throws IOException {
+    public ChatServer(ChatServerArguments chatServerArguments) throws IOException {
         tcpWelcomeService = new TCPWelcomeService(this);
         serverUdpService = new ServerUDPService(this);
         executorService = Executors.newFixedThreadPool(5);
+        usernameProfiles = new HashMap<>();
+        ipProfiles = new HashMap<>();
+        loadUserInfo(chatServerArguments.getUsersFile());
     }
 
     private void startup() throws IOException {
@@ -34,60 +47,62 @@ public class ChatServer implements AbstractChatServer {
         serverUdpService.close();
     }
 
+    private void loadUserInfo(String filename) {
+        String line;
+        BufferedReader bufferedReader = null;
+        try {
+            bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(filename)));
+            while ((line = bufferedReader.readLine()) != null) {
+                String[] words = line.split(" ");
+                ClientProfile clientProfile = new ClientProfile();
+                clientProfile.username = words[0];
+                clientProfile.password = words[1];
+                usernameProfiles.put(clientProfile.username, clientProfile);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            Utils.closeResource(bufferedReader);
+        }
+    }
+
     @Override
     public boolean isASubscriber(String username) {
-        return false;
+        return usernameProfiles.containsKey(username);
+    }
+
+    public ClientProfile getProfileByUsername(String username) {
+        return usernameProfiles.get(username);
     }
 
     @Override
-    public String getUserSecretKey(String username) {
-        return null;
+    public ClientProfile getProfileByIp(String ipAddress) {
+        return ipProfiles.get(ipAddress);
     }
 
     @Override
-    public void setId(String username, String address) {
-
+    public void addIpProfile(String ipAddress, ClientProfile usernameProfile) {
+        ipProfiles.put(ipAddress, usernameProfile);
     }
 
     @Override
-    public String getUsername(String ipAddress) {
-        return null;
-    }
-
-    @Override
-    public boolean hasMatchingRes(String username, String cipherKey) {
-        return false;
-    }
-
-    @Override
-    public String getRand(String username) {
-        return null;
-    }
-
-    @Override
-    public void saveRand(String username, String rand) {
-
-    }
-
-    @Override
-    public Key generateEncryptionKey(String username) {
-        return null;
-    }
-
-    @Override
-    public void acceptTCPConnectionFromUser(String username) {
-
-    }
-
-    @Override
-    public Key getUserEncryptionKey(String ipAddress) {
-        return null;
+    public void startSession(Socket clientSocket) {
+        try {
+            ClientProfile clientProfile = getProfileByIp(clientSocket.getInetAddress().getHostAddress());
+            TCPMessagingService tcpMessagingService = new TCPMessagingService(clientSocket, clientProfile.encryptionKey);
+            executorService.execute(tcpMessagingService);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {
+        ChatServerArguments chatServerArguments = new ChatServerArguments();
+        JCommander jCommander = new JCommander(chatServerArguments);
+        jCommander.parse(args);
         try {
             //setup
-            ChatServer chatServer = new ChatServer();
+            ChatServer chatServer = new ChatServer(chatServerArguments);
             CLIReader cliReader = new CLIReader();
             String command = "";
 

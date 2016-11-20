@@ -31,7 +31,7 @@ public interface AbstractChatClient {
 
     void shutdown();
 
-    void addTCPProtocol(ContextualProtocol contextualProtocol);
+    void addTCPProtocol(String serverResponse, ContextualProtocol responseProtocol);
 
     void startTCPMessagingService(String serverAddress, int serverPort, Key secretKey);
 

@@ -23,10 +23,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class TCPMessagingService extends Thread {
     private EncryptedTCPConnection tcpConnection;
     private BlockingQueue<String> outgoingMessages;
-    private Map<String,ContextualProtocol> protocols;
+    private Map<String, ContextualProtocol> protocols;
     private boolean stop;
 
-    public TCPMessagingService(){
+    public TCPMessagingService() {
         protocols = new HashMap<>();
     }
 
@@ -48,15 +48,14 @@ public class TCPMessagingService extends Thread {
         protocols = new HashMap<>();
     }
 
-    // used for received message porocessing
-    public void addCustomProtocol(String command, ContextualProtocol protocol){
-        protocols.put(command, protocol);
+    public void addProtocol(String serverResponse, ContextualProtocol protocol) {
+        protocols.put(serverResponse, protocol);
     }
 
     public void run() {
         while (!isInterrupted()) {
             sendMessages();
-            printReceivedMessages();
+            processIncomingMessages();
         }
         stop = true;
     }
@@ -78,17 +77,22 @@ public class TCPMessagingService extends Thread {
         }
     }
 
-    private void printReceivedMessages() {
-        while (executeProtocols() != null) ;
+    private void processIncomingMessages() {
+        while (processNextMessage() != null) ;
     }
 
-    private String executeProtocols() {
+    private String processNextMessage() {
         String receivedMessage = null;
         try {
             receivedMessage = tcpConnection.receiveMessage();
-            if(receivedMessage != null)
-                protocols.get(receivedMessage).executeProtocol();
-            System.out.println(receivedMessage);
+            boolean isProtocolMessage = receivedMessage.contains("(") && protocols.containsKey(receivedMessage.substring(0, receivedMessage.indexOf("(")));
+            if (isProtocolMessage) {
+                ContextualProtocol contextualProtocol = protocols.get(receivedMessage);
+                contextualProtocol.setContextValue("response", receivedMessage);
+                contextualProtocol.executeProtocol();
+            }
+            else
+                System.out.println(receivedMessage);
         } catch (IOException | BadPaddingException | IllegalBlockSizeException | NoSuchPaddingException | InvalidKeyException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }

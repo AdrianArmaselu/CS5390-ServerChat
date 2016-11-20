@@ -69,11 +69,11 @@ public class ServerUDPService extends Thread {
     private void logonClient(String message, String ipAddress, int port) {
         String username = ProtocolIncomingMessages.extractUsername(message);
         if (chatServer.isASubscriber(username)) {
-            chatServer.setId(username, ipAddress);
-            String rand = Utils.randomString(RAND_SIZE);
-            chatServer.saveRand(username, rand);
+            ClientProfile clientProfile = chatServer.getProfileByUsername(username);
+            chatServer.addIpProfile(ipAddress, clientProfile);
+            clientProfile.rand = Utils.randomString(RAND_SIZE);
             try {
-                senderSocket.sendMessage(ProtocolOutgoingMessages.CHALLENGE(rand), InetAddress.getByAddress(ipAddress.getBytes()), port);
+                senderSocket.sendMessage(ProtocolOutgoingMessages.CHALLENGE(clientProfile.rand), InetAddress.getByAddress(ipAddress.getBytes()), port);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -81,13 +81,15 @@ public class ServerUDPService extends Thread {
     }
 
     private void authenticateClient(String message, String ipAddress, int port) {
-        String res = ProtocolIncomingMessages.extractRes(message);
-        String username = chatServer.getUsername(ipAddress);
-        Key encryptionKey = chatServer.generateEncryptionKey(username);
-        encryptedSenderSocket.setEncryptionKey(encryptionKey);
+        String clientRes = ProtocolIncomingMessages.extractRes(message);
+        ClientProfile clientProfile = chatServer.getProfileByIp(ipAddress);
         try {
+            String serverRes = Utils.createCipherKey(clientProfile.rand, clientProfile.password);
+            Key encryptionKey = Utils.createEncryptionKey(serverRes);
+            encryptedSenderSocket.setEncryptionKey(encryptionKey);
             InetAddress clientAddress = InetAddress.getByAddress(ipAddress.getBytes());
-            if (chatServer.hasMatchingRes(username, res)) {
+            boolean authenticationCodesMatch = clientRes.equals(serverRes);
+            if (authenticationCodesMatch) {
                 encryptedSenderSocket.sendMessage(ProtocolOutgoingMessages.AUTH_SUCCESS, clientAddress, port);
             } else {
                 encryptedSenderSocket.sendMessage(ProtocolOutgoingMessages.AUTH_FAIL, clientAddress, port);
@@ -98,7 +100,8 @@ public class ServerUDPService extends Thread {
     }
 
     private void registerClient(String ipAddress) {
-        chatServer.acceptTCPConnectionFromUser(chatServer.getUsername(ipAddress)); // add to blockingqueue
+        ClientProfile clientProfile = chatServer.getProfileByIp(ipAddress);
+        clientProfile.isRegistered = true;
     }
 
     public void close() {

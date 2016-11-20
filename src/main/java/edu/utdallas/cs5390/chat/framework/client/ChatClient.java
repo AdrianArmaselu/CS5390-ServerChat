@@ -85,8 +85,8 @@ public class ChatClient implements AbstractChatClient {
     }
 
     @Override
-    public void addTCPProtocol(ContextualProtocol contextualProtocol) {
-        tcpMessagingService.addCustomProtocol(contextualProtocol);
+    public void addTCPProtocol(String serverResponse, ContextualProtocol responseProtocol) {
+        tcpMessagingService.addProtocol(serverResponse, responseProtocol);
     }
 
     @Override
