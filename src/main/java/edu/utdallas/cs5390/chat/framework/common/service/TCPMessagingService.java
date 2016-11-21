@@ -1,7 +1,9 @@
 package edu.utdallas.cs5390.chat.framework.common.service;
 
+import edu.utdallas.cs5390.chat.framework.common.ContextValues;
 import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
 import edu.utdallas.cs5390.chat.framework.common.connection.EncryptedTCPConnection;
+import edu.utdallas.cs5390.chat.framework.common.util.Utils;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -11,7 +13,8 @@ import java.net.Socket;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -82,21 +85,22 @@ public class TCPMessagingService extends Thread {
     }
 
     private String processNextMessage() {
-        String receivedMessage = null;
+        String message = null;
         try {
-            receivedMessage = tcpConnection.receiveMessage();
-            boolean isProtocolMessage = receivedMessage.contains("(") && protocols.containsKey(receivedMessage.substring(0, receivedMessage.indexOf("(")));
+            message = tcpConnection.receiveMessage();
+            boolean isProtocolMessage = message.contains("(") && protocols.containsKey(message.substring(0, message.indexOf("(")));
             if (isProtocolMessage) {
-                ContextualProtocol contextualProtocol = protocols.get(receivedMessage);
-                contextualProtocol.setContextValue("response", receivedMessage);
+                String protocolHeader = Utils.extractProtocolHeader(message);
+                ContextualProtocol contextualProtocol = protocols.get(protocolHeader);
+                contextualProtocol.setContextValue(ContextValues.message, message);
                 contextualProtocol.executeProtocol();
             }
             else
-                System.out.println(receivedMessage);
+                System.out.println(message);
         } catch (IOException | BadPaddingException | IllegalBlockSizeException | NoSuchPaddingException | InvalidKeyException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
-        return receivedMessage;
+        return message;
     }
 
     public void shutdown() {

@@ -1,12 +1,10 @@
-package edu.utdallas.cs5390.chat.impl.protocol.udp;
+package edu.utdallas.cs5390.chat.impl.client;
 
 import edu.utdallas.cs5390.chat.framework.client.AbstractChatClient;
 import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
 import edu.utdallas.cs5390.chat.framework.common.connection.udp.UDPConnection;
 import edu.utdallas.cs5390.chat.framework.common.util.TransmissionException;
 import edu.utdallas.cs5390.chat.framework.common.util.Utils;
-import edu.utdallas.cs5390.chat.impl.messages.ProtocolServerRequests;
-import edu.utdallas.cs5390.chat.impl.messages.ProtocolServerResponses;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -19,13 +17,13 @@ import java.security.NoSuchAlgorithmException;
 /**
  * Created by adisor on 10/30/2016.
  */
-public class LogonProtocol extends ContextualProtocol {
+class LogonProtocol extends ContextualProtocol {
 
     private final AbstractChatClient chatClient;
     private UDPConnection udpConnection;
     private Key encryptionKey;
 
-    public LogonProtocol(AbstractChatClient chatClient) {
+    LogonProtocol(AbstractChatClient chatClient) {
         this.chatClient = chatClient;
     }
 
@@ -37,6 +35,8 @@ public class LogonProtocol extends ContextualProtocol {
             String cipherKey = createSecretKey(rand);
             if (authenticateWithServer(cipherKey))
                 attemptEstablishTCPConnection();
+            else
+                System.out.println("Could not Authenticate with the server");
         } catch (TransmissionException | NoSuchPaddingException | InvalidKeyException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException e) {
             e.printStackTrace();
         }
@@ -60,8 +60,8 @@ public class LogonProtocol extends ContextualProtocol {
     }
 
     private void attemptEstablishTCPConnection() throws TransmissionException {
-        String response = udpConnection.sendMessageAndGetResponse(ProtocolServerRequests.REGISTER("ip"));
-        if (ProtocolServerResponses.isOK(response))
+        String response = udpConnection.sendMessageAndGetResponse(ProtocolServerRequests.REGISTER(""));
+        if (ProtocolServerResponses.isRegistered(response))
             chatClient.startTCPMessagingService(chatClient.getServerAddress(), chatClient.getServerPort(), encryptionKey);
     }
 }

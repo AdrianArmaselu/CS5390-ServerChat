@@ -1,21 +1,18 @@
-package edu.utdallas.cs5390.chat.impl;
+package edu.utdallas.cs5390.chat.impl.client;
 
 import com.beust.jcommander.JCommander;
 import edu.utdallas.cs5390.chat.framework.client.AbstractChatClient;
 import edu.utdallas.cs5390.chat.framework.client.ChatClient;
 import edu.utdallas.cs5390.chat.framework.client.ChatClientArguments;
+import edu.utdallas.cs5390.chat.framework.common.ContextValues;
 import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
-import edu.utdallas.cs5390.chat.impl.messages.ProtocolInputCommands;
-import edu.utdallas.cs5390.chat.impl.messages.ProtocolServerRequests;
-import edu.utdallas.cs5390.chat.impl.messages.ProtocolServerResponses;
-import edu.utdallas.cs5390.chat.impl.protocol.udp.LogonProtocol;
 
 import java.io.IOException;
 
 /**
  * Created by aarmaselu on 11/17/2016.
  */
-public class ChatClientLauncher {
+class ChatClientLauncher {
 
     private AbstractChatClient chatClient;
 
@@ -48,7 +45,7 @@ public class ChatClientLauncher {
         chatClient.addTCPProtocol(ProtocolServerResponses.START, new ContextualProtocol() {
             @Override
             public void executeProtocol() {
-                String response = (String) getContextValue("response");
+                String response = (String) getContextValue(ContextValues.message);
                 String chatPartnerUsername = ProtocolServerResponses.extractValue(response);
                 chatClient.setPartnerUsername(chatPartnerUsername);
                 chatClient.setIsInChatSession(true);
@@ -57,7 +54,7 @@ public class ChatClientLauncher {
         chatClient.addTCPProtocol(ProtocolServerResponses.HISTORY_RESP, new ContextualProtocol() {
             @Override
             public void executeProtocol() {
-                String response = (String) getContextValue("response");
+                String response = (String) getContextValue(ContextValues.message);
                 String history = ProtocolServerResponses.extractValue(response);
                 System.out.println(history);
             }

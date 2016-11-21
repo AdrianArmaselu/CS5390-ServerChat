@@ -10,6 +10,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.DatagramPacket;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.MessageDigest;
@@ -86,5 +87,18 @@ public class Utils {
     public static Key createEncryptionKey(String rand, String key) throws NoSuchAlgorithmException {
         String cipherKey = createCipherKey(rand, key);
         return new SecretKeySpec(cipherKey.getBytes(), 0, 16, "AES");
+    }
+
+    public static String extractProtocolHeader(String message) {
+        return message.substring(0, message.indexOf("("));
+    }
+
+    public static String extractMessage(DatagramPacket datagramPacket) {
+        byte[] messageBytes = datagramPacket.getData();
+        return new String(messageBytes);
+    }
+
+    public static String extractValue(String message) {
+        return message.substring(message.indexOf("(") + 1, message.lastIndexOf(")"));
     }
 }

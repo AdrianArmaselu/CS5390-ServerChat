@@ -1,12 +1,11 @@
 package edu.utdallas.cs5390.chat.framework.server.service;
 
+import edu.utdallas.cs5390.chat.framework.common.ContextValues;
+import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
 import edu.utdallas.cs5390.chat.framework.common.connection.udp.EncryptedUDPMessageSenderSocket;
 import edu.utdallas.cs5390.chat.framework.common.connection.udp.UDPMessageReceiverSocket;
 import edu.utdallas.cs5390.chat.framework.common.connection.udp.UDPMessageSenderSocket;
 import edu.utdallas.cs5390.chat.framework.common.util.Utils;
-import edu.utdallas.cs5390.chat.framework.server.AbstractChatServer;
-import edu.utdallas.cs5390.chat.framework.server.protocol.ProtocolIncomingMessages;
-import edu.utdallas.cs5390.chat.framework.server.protocol.ProtocolOutgoingMessages;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -18,6 +17,8 @@ import java.net.SocketException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by Adisor on 10/1/2016.
@@ -26,82 +27,49 @@ import java.security.NoSuchAlgorithmException;
 // TODO: NEED TO ANALYZE EXCEPTIONS
 public class ServerUDPService extends Thread {
     private static final int UDP_PORT = 8080;
-    private static final int RAND_SIZE = 4;
-
-    private AbstractChatServer chatServer;
     private UDPMessageReceiverSocket receiverSocket;
     private UDPMessageSenderSocket senderSocket;
     private EncryptedUDPMessageSenderSocket encryptedSenderSocket;
+    private Map<String, ContextualProtocol> protocols;
 
-    public ServerUDPService(AbstractChatServer chatServer) throws SocketException {
+    public ServerUDPService() throws SocketException {
         receiverSocket = new UDPMessageReceiverSocket(UDP_PORT);
         senderSocket = new UDPMessageSenderSocket();
         encryptedSenderSocket = new EncryptedUDPMessageSenderSocket();
-        this.chatServer = chatServer;
+        this.protocols = new HashMap<>();
     }
 
-    private String extractMessage(DatagramPacket datagramPacket) {
-        byte[] messageBytes = datagramPacket.getData();
-        return new String(messageBytes);
+    public void addProtocol(String protocolMessage, ContextualProtocol protocol){
+        protocols.put(protocolMessage, protocol);
+    }
+
+    public void sendMessage(String message, InetAddress receiverAddress, int receiverPort) throws Exception {
+        senderSocket.sendMessage(message, receiverAddress, receiverPort);
+    }
+
+    public void sendEncryptedMessage(String message, InetAddress receiverAddress, int receiverPort, Key encryptionKey) throws IllegalBlockSizeException, NoSuchAlgorithmException, IOException, BadPaddingException, NoSuchPaddingException, InvalidKeyException {
+        encryptedSenderSocket.setEncryptionKey(encryptionKey);
+        encryptedSenderSocket.sendMessage(message, receiverAddress, receiverPort);
     }
 
     public void run() {
         while (!isInterrupted()) {
-            DatagramPacket incomingPacket;
+            DatagramPacket receivedPacket;
             try {
-                incomingPacket = receiverSocket.receivePacket();
+                receivedPacket = receiverSocket.receivePacket();
             } catch (IOException e) {
                 e.printStackTrace();
                 continue;
             }
-            String message = extractMessage(incomingPacket);
-            String ipAddress = incomingPacket.getAddress().getHostAddress();
-            int port = incomingPacket.getPort();
-            if (ProtocolIncomingMessages.isHelloMessage(message))
-                logonClient(message, ipAddress, port);
-            if (ProtocolIncomingMessages.isResponseMessage(message))
-                authenticateClient(message, ipAddress, port);
-            if (ProtocolIncomingMessages.isRegisteredMessage(message))
-                registerClient(ipAddress);
-        }
-    }
-
-    private void logonClient(String message, String ipAddress, int port) {
-        String username = ProtocolIncomingMessages.extractUsername(message);
-        if (chatServer.isASubscriber(username)) {
-            ClientProfile clientProfile = chatServer.getProfileByUsername(username);
-            chatServer.addIpProfile(ipAddress, clientProfile);
-            clientProfile.rand = Utils.randomString(RAND_SIZE);
-            try {
-                senderSocket.sendMessage(ProtocolOutgoingMessages.CHALLENGE(clientProfile.rand), InetAddress.getByAddress(ipAddress.getBytes()), port);
-            } catch (Exception e) {
-                e.printStackTrace();
+            String message = Utils.extractMessage(receivedPacket);
+            boolean isProtocolMessage = message.contains("(") && protocols.containsKey(message.substring(0, message.indexOf("(")));
+            if (isProtocolMessage) {
+                String protocolHeader = Utils.extractProtocolHeader(message);
+                ContextualProtocol contextualProtocol = protocols.get(protocolHeader);
+                contextualProtocol.setContextValue(ContextValues.packet, receivedPacket);
+                contextualProtocol.executeProtocol();
             }
         }
-    }
-
-    private void authenticateClient(String message, String ipAddress, int port) {
-        String clientRes = ProtocolIncomingMessages.extractRes(message);
-        ClientProfile clientProfile = chatServer.getProfileByIp(ipAddress);
-        try {
-            String serverRes = Utils.createCipherKey(clientProfile.rand, clientProfile.password);
-            Key encryptionKey = Utils.createEncryptionKey(serverRes);
-            encryptedSenderSocket.setEncryptionKey(encryptionKey);
-            InetAddress clientAddress = InetAddress.getByAddress(ipAddress.getBytes());
-            boolean authenticationCodesMatch = clientRes.equals(serverRes);
-            if (authenticationCodesMatch) {
-                encryptedSenderSocket.sendMessage(ProtocolOutgoingMessages.AUTH_SUCCESS, clientAddress, port);
-            } else {
-                encryptedSenderSocket.sendMessage(ProtocolOutgoingMessages.AUTH_FAIL, clientAddress, port);
-            }
-        } catch (IOException | NoSuchPaddingException | InvalidKeyException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void registerClient(String ipAddress) {
-        ClientProfile clientProfile = chatServer.getProfileByIp(ipAddress);
-        clientProfile.isRegistered = true;
     }
 
     public void close() {

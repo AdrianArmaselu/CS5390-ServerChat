@@ -1,4 +1,4 @@
-package edu.utdallas.cs5390.chat.framework.server;
+package edu.utdallas.cs5390.chat.framework.server.service;
 
 public class Message {
     int sessionID;

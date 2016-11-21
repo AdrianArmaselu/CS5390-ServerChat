@@ -1,8 +1,8 @@
 package edu.utdallas.cs5390.chat.framework.server;
 
-import com.beust.jcommander.JCommander;
+import edu.utdallas.cs5390.chat.framework.common.ContextValues;
+import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
 import edu.utdallas.cs5390.chat.framework.common.service.TCPMessagingService;
-import edu.utdallas.cs5390.chat.framework.common.util.CLIReader;
 import edu.utdallas.cs5390.chat.framework.common.util.Utils;
 import edu.utdallas.cs5390.chat.framework.server.service.ClientProfile;
 import edu.utdallas.cs5390.chat.framework.server.service.ServerUDPService;
@@ -28,21 +28,28 @@ public class ChatServer implements AbstractChatServer {
     private ExecutorService executorService;
     private Map<String, ClientProfile> usernameProfiles;
     private Map<String, ClientProfile> ipProfiles;
+    private Map<String, ContextualProtocol> cliProtocols;
+    private Map<String, ContextualProtocol> tcpProtocols;
+    private Map<String, TCPMessagingService> usersService;
 
     public ChatServer(ChatServerArguments chatServerArguments) throws IOException {
         tcpWelcomeService = new TCPWelcomeService(this);
-        serverUdpService = new ServerUDPService(this);
+        serverUdpService = new ServerUDPService();
         executorService = Executors.newFixedThreadPool(5);
         usernameProfiles = new HashMap<>();
         ipProfiles = new HashMap<>();
+        cliProtocols = new HashMap<>();
+        tcpProtocols = new HashMap<>();
+        usersService = new HashMap<>();
         loadUserInfo(chatServerArguments.getUsersFile());
     }
 
-    private void startup() throws IOException {
+    public void startup() {
         tcpWelcomeService.start();
+        serverUdpService.start();
     }
 
-    private void shutdown() {
+    public void shutdown() {
         tcpWelcomeService.close();
         serverUdpService.close();
     }
@@ -90,33 +97,45 @@ public class ChatServer implements AbstractChatServer {
         try {
             ClientProfile clientProfile = getProfileByIp(clientSocket.getInetAddress().getHostAddress());
             TCPMessagingService tcpMessagingService = new TCPMessagingService(clientSocket, clientProfile.encryptionKey);
+            addTcpProtocolsToTcpMessagingService(tcpMessagingService, clientProfile);
+            usersService.put(clientProfile.username, tcpMessagingService);
             executorService.execute(tcpMessagingService);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public static void main(String[] args) {
-        ChatServerArguments chatServerArguments = new ChatServerArguments();
-        JCommander jCommander = new JCommander(chatServerArguments);
-        jCommander.parse(args);
-        try {
-            //setup
-            ChatServer chatServer = new ChatServer(chatServerArguments);
-            CLIReader cliReader = new CLIReader();
-            String command = "";
-
-            // startup
-            chatServer.startup();
-            while (!command.equals("exit")) {
-                command = cliReader.readInput();
-            }
-            chatServer.shutdown();
-            System.exit(0);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    private void addTcpProtocolsToTcpMessagingService(TCPMessagingService tcpMessagingService, ClientProfile clientProfile){
+        tcpProtocols.forEach((tcpMessage, tcpProtocol) -> {
+                    try {
+                        // we want each messaging service to have a unique instance
+                        ContextualProtocol protocolCopy = tcpProtocol.getClass().newInstance();
+                        protocolCopy.setContextValue(ContextValues.clientProfile, clientProfile);
+                        protocolCopy.setContextValue(ContextValues.tcpMessagingService, tcpMessagingService);
+                        tcpMessagingService.addProtocol(tcpMessage, protocolCopy);
+                    } catch (InstantiationException | IllegalAccessException e) {
+                        e.printStackTrace();
+                    }
+                }
+        );
     }
 
+    @Override
+    public void addTcpProtocol(String tcpMessage, ContextualProtocol tcpProtocol) {
+        tcpProtocols.put(tcpMessage, tcpProtocol);
+    }
 
+    @Override
+    public void addUdpProtocol(String udpMessage, ContextualProtocol udpProtocol) {
+        serverUdpService.addProtocol(udpMessage, udpProtocol);
+    }
+
+    public ServerUDPService getUdpService() {
+        return serverUdpService;
+    }
+
+    @Override
+    public TCPMessagingService getTcpMessagingService(String targetUsername) {
+        return usersService.get(targetUsername);
+    }
 }

@@ -31,7 +31,7 @@ public abstract class AbstractConnection {
             }
 
         } while (response == null && retries < MAX_RETRIES);
-        if (retries == MAX_RETRIES) throw new TransmissionException("No response received or host is unreachable");
+        if (retries == MAX_RETRIES) throw new TransmissionException("No message received or host is unreachable");
         return response;
     }
 
