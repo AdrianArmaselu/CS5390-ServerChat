@@ -33,17 +33,17 @@ public class ChatClient implements AbstractChatClient {
         this.chatClientArguments = chatClientArguments;
         cliReader = new CLIReader();
         try {
-            udpConnection = new UDPConnection(chatClientArguments.getServerAddress(), chatClientArguments.getPort());
+            udpConnection = new UDPConnection(chatClientArguments.getServerAddress(), chatClientArguments.getUdpClientPort(), chatClientArguments.getUdpServerPort());
         } catch (SocketException | UnknownHostException e) {
             e.printStackTrace();
-        } finally {
-            shutdown();
         }
     }
 
     public void run() {
+        System.out.println("started client");
         String message = "";
         while (!message.equals("exit")) {
+            System.out.println(message);
             message = cliReader.readInput();
             executeCommand(message);
         }
@@ -65,13 +65,18 @@ public class ChatClient implements AbstractChatClient {
         this.partnerUsername = partnerUsername;
     }
 
+    @Override
+    public int getServerTcpPort() {
+        return chatClientArguments.getTcpPort();
+    }
+
     private void executeCommand(String message) {
-        cliProtocols.get(message).executeProtocol();
-        // nullpointer exception
-        if (!cliProtocols.containsKey(message) && isInChatSession())
+        if(cliProtocols.containsKey(message))
+            cliProtocols.get(message).executeProtocol();
+        else if (!cliProtocols.containsKey(message) && isInChatSession())
             queueMessage(message);
         else if (!cliProtocols.containsKey(message) && !isInChatSession())
-            System.out.println("Command Not Recognized. Here is a list of available commands: <Needs development>");
+            System.out.println("Command Not Recognized. Here is a list of available commands: <Needs development>"); // TODO: THIS SHOULD BE HANDLED FROM OUTSIDE
     }
 
     public void shutdown() {
@@ -139,10 +144,5 @@ public class ChatClient implements AbstractChatClient {
     @Override
     public String getServerAddress() {
         return chatClientArguments.getServerAddress();
-    }
-
-    @Override
-    public int getServerPort() {
-        return chatClientArguments.getPort();
     }
 }

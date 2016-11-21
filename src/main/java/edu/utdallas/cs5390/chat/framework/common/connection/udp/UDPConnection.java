@@ -13,11 +13,11 @@ public class UDPConnection extends AbstractConnection{
     private InetAddress serverAddress;
     private int serverPort;
 
-    public UDPConnection(String serverAddress, int serverPort) throws UnknownHostException, SocketException {
-        this.serverAddress = InetAddress.getByAddress(serverAddress.getBytes());
+    public UDPConnection(String serverAddress, int clientPort, int serverPort) throws UnknownHostException, SocketException {
+        this.serverAddress = InetAddress.getByName(serverAddress);
         this.serverPort = serverPort;
+        udpMessageReceiverSocket = new UDPMessageReceiverSocket(clientPort);
         udpMessageSenderSocket = new UDPMessageSenderSocket();
-        udpMessageReceiverSocket = new UDPMessageReceiverSocket(serverPort);
     }
 
     @Override

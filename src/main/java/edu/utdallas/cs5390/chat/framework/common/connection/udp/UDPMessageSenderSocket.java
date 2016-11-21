@@ -10,6 +10,7 @@ import java.net.SocketException;
  */
 
 public class UDPMessageSenderSocket extends UDPMessageSocket {
+
     public UDPMessageSenderSocket() throws SocketException {
         super(new DatagramSocket());
     }

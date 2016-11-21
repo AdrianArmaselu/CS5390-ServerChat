@@ -26,14 +26,14 @@ import java.util.Map;
 
 // TODO: NEED TO ANALYZE EXCEPTIONS
 public class ServerUDPService extends Thread {
-    private static final int UDP_PORT = 8080;
     private UDPMessageReceiverSocket receiverSocket;
     private UDPMessageSenderSocket senderSocket;
     private EncryptedUDPMessageSenderSocket encryptedSenderSocket;
     private Map<String, ContextualProtocol> protocols;
 
-    public ServerUDPService() throws SocketException {
-        receiverSocket = new UDPMessageReceiverSocket(UDP_PORT);
+    public ServerUDPService(int port) throws SocketException {
+//        DatagramSocket datagramSocket = new DatagramSocket(port);
+        receiverSocket = new UDPMessageReceiverSocket(port);
         senderSocket = new UDPMessageSenderSocket();
         encryptedSenderSocket = new EncryptedUDPMessageSenderSocket();
         this.protocols = new HashMap<>();
@@ -44,6 +44,7 @@ public class ServerUDPService extends Thread {
     }
 
     public void sendMessage(String message, InetAddress receiverAddress, int receiverPort) throws Exception {
+        System.out.println(receiverAddress + " " + receiverPort + " " + message);
         senderSocket.sendMessage(message, receiverAddress, receiverPort);
     }
 
@@ -53,15 +54,18 @@ public class ServerUDPService extends Thread {
     }
 
     public void run() {
+        System.out.println("Running");
         while (!isInterrupted()) {
             DatagramPacket receivedPacket;
             try {
                 receivedPacket = receiverSocket.receivePacket();
             } catch (IOException e) {
-                e.printStackTrace();
+                if(!e.getMessage().equals("Receive timed out"))
+                    e.printStackTrace();
                 continue;
             }
             String message = Utils.extractMessage(receivedPacket);
+            System.out.println("Received message " + message);
             boolean isProtocolMessage = message.contains("(") && protocols.containsKey(message.substring(0, message.indexOf("(")));
             if (isProtocolMessage) {
                 String protocolHeader = Utils.extractProtocolHeader(message);

@@ -1,7 +1,6 @@
 package edu.utdallas.cs5390.chat.impl.server;
 
 import com.beust.jcommander.JCommander;
-import edu.utdallas.cs5390.chat.framework.client.ChatClientArguments;
 import edu.utdallas.cs5390.chat.framework.common.ContextValues;
 import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
 import edu.utdallas.cs5390.chat.framework.common.service.TCPMessagingService;
@@ -28,8 +27,13 @@ import java.security.NoSuchAlgorithmException;
  */
 
 // TODO: IF A MESSAGE NEEDS TO BE RETRANSMITTED, DO NOT RE-EXECUTE THE CODE
+
+//8080 - udp server, 8081 - udp client, 8082 - tcp 8083
 class ChatServerLauncher {
     private AbstractChatServer chatServer;
+
+    // TODO: CHANGE THIS TO CMD ARGUMENT
+    public static final int clientPort = 8081;
 
     private void run(String[] args) throws IOException {
         ChatServerArguments chatServerArguments = new ChatServerArguments();
@@ -39,27 +43,21 @@ class ChatServerLauncher {
         addCLIProtocols();
         addUdpProtocols();
         addTCPProtocols();
-        try {
-            //setup
-            AbstractChatServer chatServer = new ChatServer(chatServerArguments);
-            CLIReader cliReader = new CLIReader();
-            String command = "";
-
-            // startup
-            chatServer.startup();
-            while (!command.equals("exit")) {
-                command = cliReader.readInput();
-            }
-            chatServer.shutdown();
-            System.exit(0);
-        } catch (IOException e) {
-            e.printStackTrace();
+        //setup
+        CLIReader cliReader = new CLIReader();
+        String command = "";
+        // startup
+        chatServer.startup();
+        while (!command.equals("exit")) {
+            command = cliReader.readInput();
         }
+        chatServer.shutdown();
+        System.exit(0);
     }
 
 
     private void printUsage() {
-        new JCommander(new ChatClientArguments()).usage();
+        new JCommander(new ChatServerArguments()).usage();
     }
 
     private void addCLIProtocols() {
@@ -73,14 +71,13 @@ class ChatServerLauncher {
                 String message = Utils.extractMessage(datagramPacket);
                 String username = Utils.extractValue(message);
                 String clientIp = datagramPacket.getAddress().getHostAddress();
-                int port = datagramPacket.getPort();
                 if (chatServer.isASubscriber(username)) {
                     ClientProfile clientProfile = chatServer.getProfileByUsername(username);
                     chatServer.addIpProfile(clientIp, clientProfile);
                     clientProfile.rand = Utils.randomString(4);
                     try {
                         ServerUDPService serverUDPService = chatServer.getUdpService();
-                        serverUDPService.sendMessage(ProtocolOutgoingMessages.CHALLENGE(clientProfile.rand), InetAddress.getByAddress(clientIp.getBytes()), port);
+                        serverUDPService.sendMessage(ProtocolOutgoingMessages.CHALLENGE(clientProfile.rand), InetAddress.getByName(clientIp), clientPort);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -95,17 +92,18 @@ class ChatServerLauncher {
                 String message = Utils.extractMessage(datagramPacket);
                 String clientRes = Utils.extractValue(message);
                 String clientIp = datagramPacket.getAddress().getHostAddress();
-                int clientPort = datagramPacket.getPort();
                 ClientProfile clientProfile = chatServer.getProfileByIp(clientIp);
                 try {
                     String serverRes = Utils.createCipherKey(clientProfile.rand, clientProfile.password);
+                    System.out.println("Created server res " + serverRes);
                     Key encryptionKey = Utils.createEncryptionKey(serverRes);
                     ServerUDPService serverUDPService = chatServer.getUdpService();
+                    System.out.println("res match: " + serverRes + " " + clientRes);
                     boolean authenticationCodesMatch = clientRes.equals(serverRes);
                     if (authenticationCodesMatch) {
-                        serverUDPService.sendEncryptedMessage(ProtocolOutgoingMessages.AUTH_SUCCESS, InetAddress.getByAddress(clientIp.getBytes()), clientPort, encryptionKey);
+                        serverUDPService.sendEncryptedMessage(ProtocolOutgoingMessages.AUTH_SUCCESS, InetAddress.getByName(clientIp), clientPort, encryptionKey);
                     } else {
-                        serverUDPService.sendEncryptedMessage(ProtocolOutgoingMessages.AUTH_FAIL, InetAddress.getByAddress(clientIp.getBytes()), clientPort, encryptionKey);
+                        serverUDPService.sendEncryptedMessage(ProtocolOutgoingMessages.AUTH_FAIL, InetAddress.getByName(clientIp), clientPort, encryptionKey);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -124,8 +122,8 @@ class ChatServerLauncher {
                 try {
                     serverUDPService.sendEncryptedMessage(
                             ProtocolOutgoingMessages.AUTH_SUCCESS,
-                            InetAddress.getByAddress(clientIp.getBytes()),
-                            datagramPacket.getPort(),
+                            InetAddress.getByName(clientIp),
+                            clientPort,
                             clientProfile.encryptionKey
                     );
                 } catch (IllegalBlockSizeException | NoSuchAlgorithmException | BadPaddingException | IOException | InvalidKeyException | NoSuchPaddingException e) {
@@ -144,12 +142,12 @@ class ChatServerLauncher {
                 String message = (String) getContextValue(ContextValues.message);
                 String targetUsername = Utils.extractValue(message);
                 ClientProfile targetProfile = chatServer.getProfileByUsername(targetUsername);
-                if(targetProfile.isRegistered && !targetProfile.inSession){
+                if (targetProfile.isRegistered && !targetProfile.inSession) {
                     String sessionId = Utils.UUID();
                     TCPMessagingService targetMessagingService = chatServer.getTcpMessagingService(targetUsername);
                     tcpMessagingService.queueMessage(ProtocolOutgoingMessages.START(sessionId, targetProfile.username));
                     targetMessagingService.queueMessage(ProtocolOutgoingMessages.START(sessionId, clientProfile.username));
-                }else{
+                } else {
                     tcpMessagingService.queueMessage(ProtocolOutgoingMessages.UNREACHABLE(targetProfile.username));
                 }
             }

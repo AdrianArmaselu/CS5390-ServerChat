@@ -7,7 +7,7 @@ import edu.utdallas.cs5390.chat.framework.common.util.TransmissionException;
  */
 public abstract class AbstractConnection {
     private static final int MAX_RETRIES = 3;
-    static final int RECEIVE_TIMEOUT = 100;
+    static final int RECEIVE_TIMEOUT = 1000;
 
     public AbstractConnection() {
     }

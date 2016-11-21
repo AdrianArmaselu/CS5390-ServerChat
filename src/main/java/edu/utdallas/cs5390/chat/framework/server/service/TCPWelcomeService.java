@@ -14,14 +14,12 @@ import java.net.Socket;
 
 public class TCPWelcomeService extends Thread {
     private static final int SOCKET_WAIT_TIMEOUT = Utils.seconds(1);
-    private static final int TCP_PORT = 8081;
-
     private AbstractChatServer chatServer;
     private ServerSocket serverSocket;
 
-    public TCPWelcomeService(ChatServer chatServer) throws IOException {
+    public TCPWelcomeService(ChatServer chatServer, int port) throws IOException {
         this.chatServer = chatServer;
-        serverSocket = new ServerSocket(TCP_PORT);
+        serverSocket = new ServerSocket(port);
         serverSocket.setSoTimeout(SOCKET_WAIT_TIMEOUT);
     }
 

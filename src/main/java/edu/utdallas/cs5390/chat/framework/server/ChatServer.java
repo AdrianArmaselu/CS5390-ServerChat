@@ -33,8 +33,8 @@ public class ChatServer implements AbstractChatServer {
     private Map<String, TCPMessagingService> usersService;
 
     public ChatServer(ChatServerArguments chatServerArguments) throws IOException {
-        tcpWelcomeService = new TCPWelcomeService(this);
-        serverUdpService = new ServerUDPService();
+        tcpWelcomeService = new TCPWelcomeService(this, chatServerArguments.getTcpPort());
+        serverUdpService = new ServerUDPService(chatServerArguments.getUdpPort());
         executorService = Executors.newFixedThreadPool(5);
         usernameProfiles = new HashMap<>();
         ipProfiles = new HashMap<>();
@@ -42,11 +42,13 @@ public class ChatServer implements AbstractChatServer {
         tcpProtocols = new HashMap<>();
         usersService = new HashMap<>();
         loadUserInfo(chatServerArguments.getUsersFile());
+        System.out.println("Server initialized");
     }
 
     public void startup() {
         tcpWelcomeService.start();
         serverUdpService.start();
+        System.out.println("Server up and Running");
     }
 
     public void shutdown() {
@@ -59,7 +61,7 @@ public class ChatServer implements AbstractChatServer {
         BufferedReader bufferedReader = null;
         try {
             bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(filename)));
-            while ((line = bufferedReader.readLine()) != null) {
+            while ((line = bufferedReader.readLine()) != null && !line.isEmpty()) {
                 String[] words = line.split(" ");
                 ClientProfile clientProfile = new ClientProfile();
                 clientProfile.username = words[0];

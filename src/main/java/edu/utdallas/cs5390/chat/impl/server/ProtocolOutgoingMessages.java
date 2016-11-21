@@ -5,23 +5,23 @@ package edu.utdallas.cs5390.chat.impl.server;
  */
 class ProtocolOutgoingMessages {
 
-    static String CHALLENGE(String code) {
-        return "Challenge (" + code + ")";
-    }
-
     static final String AUTH_SUCCESS = "AUTH_SUCCESS";
 
     static final String AUTH_FAIL = "AUTH_FAIL";
 
-    public static String START(String sessionId, String username) {
+    static String CHALLENGE(String code) {
+        return "CHALLENGE (" + code + ")";
+    }
+
+    static String START(String sessionId, String username) {
         return "START(" + sessionId + "," + username + ")";
     }
 
-    public static String UNREACHABLE(String username) {
+    static String UNREACHABLE(String username) {
         return "UNREACHABLE(" + username + ")";
     }
 
-    public static String END_NOTIF(String sessionId) {
+    static String END_NOTIF(String sessionId) {
         return "END_NOTIF(" + sessionId + ")";
     }
 }

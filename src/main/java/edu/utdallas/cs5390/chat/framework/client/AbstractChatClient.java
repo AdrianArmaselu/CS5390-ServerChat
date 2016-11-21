@@ -17,8 +17,6 @@ public interface AbstractChatClient {
 
     String getServerAddress();
 
-    int getServerPort();
-
     void setIsInChatSession(boolean isInChatSession);
 
     boolean isInChatSession();
@@ -42,4 +40,6 @@ public interface AbstractChatClient {
     String getPartnerUsername();
 
     void setPartnerUsername(String partnerUsername);
+
+    int getServerTcpPort();
 }

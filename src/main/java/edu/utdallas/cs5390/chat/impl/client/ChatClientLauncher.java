@@ -114,6 +114,7 @@ class ChatClientLauncher {
         try {
             chatClientLauncher.run(args);
         } catch (Exception ignored) {
+            ignored.printStackTrace();
             chatClientLauncher.printUsage();
         }
     }

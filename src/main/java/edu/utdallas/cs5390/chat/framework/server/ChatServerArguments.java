@@ -7,14 +7,21 @@ import com.beust.jcommander.Parameter;
  */
 public class ChatServerArguments {
 
-    @Parameter(names = "-port", required = true, description = "port to listen for incoming data")
-    private int serverPort;
+    @Parameter(names = "-tcpport", required = true, description = "port to listen for incoming data for tcp")
+    private int tcpPort;
+
+    @Parameter(names = "-udpport", required = true, description = "port to listen for incoming data for udp")
+    private int udpPort;
 
     @Parameter(names = "-file", required = true, description = "file in which user profiles are stored")
     private String usersFile;
 
-    public int getServerPort() {
-        return serverPort;
+    public int getTcpPort() {
+        return tcpPort;
+    }
+
+    public int getUdpPort() {
+        return udpPort;
     }
 
     public String getUsersFile() {

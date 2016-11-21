@@ -12,7 +12,7 @@ import java.net.SocketException;
  */
 public class UDPMessageReceiverSocket extends UDPMessageSocket {
     private static final int PACKET_BUFFER_SIZE = Utils.kilobytes(1);
-    private static final int RECEIVE_TIMEOUT = 100;
+    private static final int RECEIVE_TIMEOUT = 1000;
 
     public UDPMessageReceiverSocket(int udpPort) throws SocketException {
         this(new DatagramSocket(udpPort));

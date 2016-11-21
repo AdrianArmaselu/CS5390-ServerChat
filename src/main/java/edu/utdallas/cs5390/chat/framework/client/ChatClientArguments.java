@@ -10,8 +10,14 @@ public class ChatClientArguments {
     @Parameter(names = "-host", required = true, description = "server host address")
     private String serverAddress;
 
-    @Parameter(names = "-port", required = true, description = "port to listen for incoming data")
-    private int serverPort;
+    @Parameter(names = "-tcpport", required = true, description = "port to listen for incoming data for tcp")
+    private int tcpPort;
+
+    @Parameter(names = "-udpportclient", required = true, description = "port to listen for incoming data for udp")
+    private int udpClientPort;
+
+    @Parameter(names = "-udpportserver", required = true, description = "the udp port of the server")
+    private int udpServerPort;
 
     @Parameter(names = "-user", required = true, description = "username/userid")
     private String username;
@@ -23,8 +29,16 @@ public class ChatClientArguments {
         return serverAddress;
     }
 
-    public int getPort() {
-        return serverPort;
+    public int getTcpPort() {
+        return tcpPort;
+    }
+
+    public int getUdpClientPort() {
+        return udpClientPort;
+    }
+
+    public int getUdpServerPort() {
+        return udpServerPort;
     }
 
     public String getUsername() {

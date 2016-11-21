@@ -55,6 +55,8 @@ class LogonProtocol extends ContextualProtocol {
 
     private boolean authenticateWithServer(String cipherKey) throws TransmissionException, IllegalBlockSizeException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException {
         String response = udpConnection.sendMessageAndGetResponse(ProtocolServerRequests.RESPONSE(cipherKey));
+        System.out.println(response + " " + response.length());
+        System.out.println(response.length());
         response = Utils.cipherMessage(encryptionKey, Cipher.DECRYPT_MODE, response);
         return ProtocolServerResponses.isAuthSuccessful(response);
     }
@@ -62,6 +64,6 @@ class LogonProtocol extends ContextualProtocol {
     private void attemptEstablishTCPConnection() throws TransmissionException {
         String response = udpConnection.sendMessageAndGetResponse(ProtocolServerRequests.REGISTER(""));
         if (ProtocolServerResponses.isRegistered(response))
-            chatClient.startTCPMessagingService(chatClient.getServerAddress(), chatClient.getServerPort(), encryptionKey);
+            chatClient.startTCPMessagingService(chatClient.getServerAddress(), chatClient.getServerTcpPort(), encryptionKey);
     }
 }
