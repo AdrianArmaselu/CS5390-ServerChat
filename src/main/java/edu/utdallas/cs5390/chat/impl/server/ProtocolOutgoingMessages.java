@@ -3,25 +3,26 @@ package edu.utdallas.cs5390.chat.impl.server;
 /**
  * Created by adisor on 10/30/2016.
  */
-class ProtocolOutgoingMessages {
+public class ProtocolOutgoingMessages {
 
-    static final String AUTH_SUCCESS = "AUTH_SUCCESS";
+    public static final String AUTH_SUCCESS = "AUTH_SUCCESS";
 
-    static final String AUTH_FAIL = "AUTH_FAIL";
+    public static final String AUTH_FAIL = "AUTH_FAIL";
+    public static final String REGISTERED = "REGISTERED";
 
-    static String CHALLENGE(String code) {
+    public static String CHALLENGE(String code) {
         return "CHALLENGE (" + code + ")";
     }
 
-    static String START(String sessionId, String username) {
+    public static String START(String sessionId, String username) {
         return "START(" + sessionId + "," + username + ")";
     }
 
-    static String UNREACHABLE(String username) {
+    public static String UNREACHABLE(String username) {
         return "UNREACHABLE(" + username + ")";
     }
 
-    static String END_NOTIF(String sessionId) {
+    public static String END_NOTIF(String sessionId) {
         return "END_NOTIF(" + sessionId + ")";
     }
 }

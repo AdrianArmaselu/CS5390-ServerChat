@@ -13,9 +13,6 @@ public class ChatClientArguments {
     @Parameter(names = "-tcpport", required = true, description = "port to listen for incoming data for tcp")
     private int tcpPort;
 
-    @Parameter(names = "-udpportclient", required = true, description = "port to listen for incoming data for udp")
-    private int udpClientPort;
-
     @Parameter(names = "-udpportserver", required = true, description = "the udp port of the server")
     private int udpServerPort;
 
@@ -31,10 +28,6 @@ public class ChatClientArguments {
 
     public int getTcpPort() {
         return tcpPort;
-    }
-
-    public int getUdpClientPort() {
-        return udpClientPort;
     }
 
     public int getUdpServerPort() {

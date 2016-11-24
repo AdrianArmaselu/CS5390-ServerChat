@@ -5,18 +5,10 @@ package edu.utdallas.cs5390.chat;
  */
 public class Test {
     public static void main(String[] args) {
-        A a = new A() {
-            @Override
-            public void test() {
-                System.out.println("B");
-            }
-        };
-        try {
-            A b =a.getClass().newInstance();
-            b.test();
-        } catch (InstantiationException | IllegalAccessException e) {
-            e.printStackTrace();
-        }
+        byte[] cipheredBytes = new byte[]{123 ,3};
+        char[] chars = new char[cipheredBytes.length];
+        System.arraycopy(cipheredBytes, 0, chars, 0, chars.length);
+        new String(chars);
     }
     interface A{
         public void test();

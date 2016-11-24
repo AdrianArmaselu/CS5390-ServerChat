@@ -12,4 +12,6 @@ class ProtocolServerRequests {
     static String HISTORY_REQ(String partnerUsername) {
         return "HISTORY_REQ(" + partnerUsername + ")";
     }
+    static String CONNECT(String partnerUsername) {return "CONNECT(" + partnerUsername + ")";}
+    static String END_REQUEST(String sessionId){return "END_REQUEST(" + sessionId + ")";}
 }

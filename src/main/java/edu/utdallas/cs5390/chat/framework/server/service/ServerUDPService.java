@@ -1,22 +1,17 @@
 package edu.utdallas.cs5390.chat.framework.server.service;
 
+import edu.utdallas.cs5390.chat.framework.common.ChatPacket;
 import edu.utdallas.cs5390.chat.framework.common.ContextValues;
 import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
-import edu.utdallas.cs5390.chat.framework.common.connection.udp.EncryptedUDPMessageSenderSocket;
-import edu.utdallas.cs5390.chat.framework.common.connection.udp.UDPMessageReceiverSocket;
-import edu.utdallas.cs5390.chat.framework.common.connection.udp.UDPMessageSenderSocket;
+import edu.utdallas.cs5390.chat.framework.common.connection.UdpConnection;
 import edu.utdallas.cs5390.chat.framework.common.util.Utils;
+import edu.utdallas.cs5390.chat.framework.server.ChatServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.InetAddress;
+import java.net.DatagramSocket;
 import java.net.SocketException;
-import java.security.InvalidKeyException;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,57 +21,58 @@ import java.util.Map;
 
 // TODO: NEED TO ANALYZE EXCEPTIONS
 public class ServerUDPService extends Thread {
-    private UDPMessageReceiverSocket receiverSocket;
-    private UDPMessageSenderSocket senderSocket;
-    private EncryptedUDPMessageSenderSocket encryptedSenderSocket;
+    private final Logger logger = LoggerFactory.getLogger(ServerUDPService.class);
     private Map<String, ContextualProtocol> protocols;
+    private DatagramSocket datagramSocket;
+    private Map<String, UdpConnection> clientConnections;
 
-    public ServerUDPService(int port) throws SocketException {
-//        DatagramSocket datagramSocket = new DatagramSocket(port);
-        receiverSocket = new UDPMessageReceiverSocket(port);
-        senderSocket = new UDPMessageSenderSocket();
-        encryptedSenderSocket = new EncryptedUDPMessageSenderSocket();
+    public ServerUDPService(ChatServer chatServer, int port) throws SocketException {
         this.protocols = new HashMap<>();
+        clientConnections = new HashMap<>();
+        datagramSocket = new DatagramSocket(port);
     }
 
-    public void addProtocol(String protocolMessage, ContextualProtocol protocol){
+    public void addProtocol(String protocolMessage, ContextualProtocol protocol) {
         protocols.put(protocolMessage, protocol);
-    }
-
-    public void sendMessage(String message, InetAddress receiverAddress, int receiverPort) throws Exception {
-        System.out.println(receiverAddress + " " + receiverPort + " " + message);
-        senderSocket.sendMessage(message, receiverAddress, receiverPort);
-    }
-
-    public void sendEncryptedMessage(String message, InetAddress receiverAddress, int receiverPort, Key encryptionKey) throws IllegalBlockSizeException, NoSuchAlgorithmException, IOException, BadPaddingException, NoSuchPaddingException, InvalidKeyException {
-        encryptedSenderSocket.setEncryptionKey(encryptionKey);
-        encryptedSenderSocket.sendMessage(message, receiverAddress, receiverPort);
+        logger.debug("Added protocol for message " + protocolMessage);
     }
 
     public void run() {
-        System.out.println("Running");
+        logger.debug("lala");
         while (!isInterrupted()) {
-            DatagramPacket receivedPacket;
             try {
-                receivedPacket = receiverSocket.receivePacket();
-            } catch (IOException e) {
-                if(!e.getMessage().equals("Receive timed out"))
-                    e.printStackTrace();
-                continue;
-            }
-            String message = Utils.extractMessage(receivedPacket);
-            System.out.println("Received message " + message);
-            boolean isProtocolMessage = message.contains("(") && protocols.containsKey(message.substring(0, message.indexOf("(")));
-            if (isProtocolMessage) {
+                byte[] buffer = new byte[1024];
+                DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
+                datagramSocket.receive(receivedPacket);
+                String clientIp = receivedPacket.getAddress().getHostAddress();
+                String address = clientIp + ":" + receivedPacket.getPort();
+                logger.debug(String.format("Received new packet from %s:%d", clientIp, receivedPacket.getPort()));
+                String message;
+                if(clientConnections.containsKey(address)) {
+                    message = clientConnections.get(address).receiveMessage();
+                }else{
+                    clientConnections.put(address, new UdpConnection(datagramSocket, clientIp, receivedPacket.getPort()));
+                    message = new ChatPacket(receivedPacket.getData()).getMessage(null);
+                    logger.debug("Creating udp connection with client");
+                }
                 String protocolHeader = Utils.extractProtocolHeader(message);
-                ContextualProtocol contextualProtocol = protocols.get(protocolHeader);
-                contextualProtocol.setContextValue(ContextValues.packet, receivedPacket);
-                contextualProtocol.executeProtocol();
+                logger.debug("Received message " + message);
+                boolean isProtocolMessage = message.contains("(") && protocols.containsKey(protocolHeader);
+                if (isProtocolMessage) {
+                    ContextualProtocol contextualProtocol = protocols.get(protocolHeader);
+                    contextualProtocol.setContextValue(ContextValues.message, message);
+                    contextualProtocol.setContextValue(ContextValues.udpConnection, clientConnections.get(address));
+                    contextualProtocol.executeProtocol();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                if (!e.getMessage().equals("Receive timed out"))
+                    e.printStackTrace();
             }
         }
     }
 
     public void close() {
-        receiverSocket.close();
+        Utils.closeResource(datagramSocket);
     }
 }

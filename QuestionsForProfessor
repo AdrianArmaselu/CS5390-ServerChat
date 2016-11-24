@@ -1,3 +1,10 @@
 1. Do we have to send communication EXACTLY AS SPECIFIED IN THE SPECIFICATION DOCUMENT?
-2. Do we need to send the ip address ourselves, or do we just need to send the register message
+2. Do we need to send the ip address ourselves, or do we just need to send the register historyMessage
 3. If you are already in a chat, do you do start chat directly or have to close the chat first?
+4. if a new datagram socket is created, it will not be listening on a new port
+
+
+Issues I found:
+1. I needed to find a way to better communicate through UDP because just having a large buffer did not cut it
+2. I needed to find  a way to design and separate components to make modifications and find errors easily
+3. had issues with transmitting historyMessage: string vs byte array when encrypting

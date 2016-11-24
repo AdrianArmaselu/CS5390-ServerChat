@@ -19,6 +19,7 @@ public class CLIReader {
     }
 
     public String readInput() {
+        System.out.print(":>");
         try {
             return bufferedReader.readLine();
         } catch (IOException e) {

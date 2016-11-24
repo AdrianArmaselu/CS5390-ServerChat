@@ -1,31 +1,24 @@
 package edu.utdallas.cs5390.chat.framework.server.service;
 
-public class Message {
-    int sessionID;
+public class HistoryMessage {
+    String sessionID;
     private String fromID;
     private String toID;
     private String content;
 
 
-    Message(int sessionID, String fromID, String toID, String content) {
+    public HistoryMessage(String sessionID, String fromID, String toID, String content) {
         this.sessionID = sessionID;
         this.fromID = fromID;
         this.toID = toID;
         this.content = content;
     }
 
-    Message() {
-        sessionID = 0;
-        fromID = "";
-        toID = "";
-        content = "";
-    }
-
-    public int getSessionID() {
+    public String getSessionID() {
         return sessionID;
     }
 
-    public void setSessionID(int id) {
+    public void setSessionID(String id) {
         sessionID = id;
     }
 

@@ -1,5 +1,9 @@
 package edu.utdallas.cs5390.chat.impl.client;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Created by adisor on 10/30/2016.
  */
@@ -17,8 +21,15 @@ class ProtocolServerResponses {
         return message.substring(message.indexOf("(") + 1, message.lastIndexOf(")"));
     }
 
+    static List<String> extractValues(String message) {
+        List<String> values = new ArrayList<>();
+        String valuesString = message.substring(message.indexOf("(") + 1, message.lastIndexOf(")"));
+        Collections.addAll(values, valuesString.split(","));
+        return values;
+    }
+
     static boolean isAuthSuccessful(String response) {
-        return extractValue(response).equals("AUTH_SUCCESS");
+        return response.equals("AUTH_SUCCESS");
     }
 
     static boolean isRegistered(String response){

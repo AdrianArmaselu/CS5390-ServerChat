@@ -8,10 +8,12 @@ import edu.utdallas.cs5390.chat.framework.common.ContextValues;
 import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Created by aarmaselu on 11/17/2016.
  */
+//TODO: WHEN LAUNCHING A NEW CLIENT, CHECK TO SEE IF UDP PORT FOR LISTENING IS BOUND. IF IT IS, USE THE NEXT PORT. SERVER NEEDS TO KEEP TRACK OF THIS
 class ChatClientLauncher {
 
     private AbstractChatClient chatClient;
@@ -35,8 +37,9 @@ class ChatClientLauncher {
             @Override
             public void executeProtocol() {
                 try {
-                    chatClient.setIsInChatSession(false);
+                    chatClient.setSessionId(null);
                     chatClient.setPartnerUsername(null);
+                    System.out.println("Chat session ended");
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -46,9 +49,10 @@ class ChatClientLauncher {
             @Override
             public void executeProtocol() {
                 String response = (String) getContextValue(ContextValues.message);
-                String chatPartnerUsername = ProtocolServerResponses.extractValue(response);
-                chatClient.setPartnerUsername(chatPartnerUsername);
-                chatClient.setIsInChatSession(true);
+                List<String> values = ProtocolServerResponses.extractValues(response);
+                chatClient.setPartnerUsername(values.get(1));
+                chatClient.setSessionId(values.get(0));
+                System.out.println("Started chat session with user " + values.get(1) + ". Session id is " + values.get(0));
             }
         });
         chatClient.addTCPProtocol(ProtocolServerResponses.HISTORY_RESP, new ContextualProtocol() {
@@ -56,6 +60,7 @@ class ChatClientLauncher {
             public void executeProtocol() {
                 String response = (String) getContextValue(ContextValues.message);
                 String history = ProtocolServerResponses.extractValue(response);
+                System.out.println("History: ");
                 System.out.println(history);
             }
         });
@@ -67,13 +72,12 @@ class ChatClientLauncher {
             @Override
             public void executeProtocol() {
                 if (!chatClient.isInChatSession()) {
-                    String chatPartnerUsername = chatClient.readInput();
+                    System.out.println("Sending start chat request to the server...");
+                    String chatPartnerUsername = (String) getContextValue(ContextValues.chatPartnerUsername);
                     chatClient.setPartnerUsername(chatPartnerUsername);
-                    chatClient.queueMessage("connect: " + chatPartnerUsername);
-                    chatClient.setIsInChatSession(true);
+                    chatClient.queueMessage(ProtocolServerRequests.CONNECT(chatPartnerUsername));
                 } else {
-                    chatClient.setIsInChatSession(false);
-                    System.out.println("Sorry bud, you are already in a chat session. First disconnect");
+                    System.out.println("You are already in a chat session. Disconnect first.");
                 }
             }
         });
@@ -81,9 +85,8 @@ class ChatClientLauncher {
             @Override
             public void executeProtocol() {
                 try {
-                    chatClient.queueMessage("end");
-                    chatClient.setIsInChatSession(false);
-                    chatClient.setPartnerUsername(null);
+                    System.out.println("Sending end chat request to the server...");
+                    chatClient.queueMessage(ProtocolServerRequests.END_REQUEST(chatClient.getSessionId()));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -92,18 +95,22 @@ class ChatClientLauncher {
         chatClient.addCliProtocol(ProtocolInputCommands.LOGOFF, new ContextualProtocol() {
             @Override
             public void executeProtocol() {
+                System.out.println("Logging off...");
                 chatClient.logoff();
+                System.out.println("Logged off");
             }
         });
         chatClient.addCliProtocol(ProtocolInputCommands.EXIT, new ContextualProtocol() {
             @Override
             public void executeProtocol() {
+                System.out.println("Shutting down...");
                 chatClient.shutdown();
             }
         });
         chatClient.addCliProtocol(ProtocolInputCommands.HISTORY, new ContextualProtocol() {
             @Override
             public void executeProtocol() {
+                System.out.println("Sending history request to the server...");
                 chatClient.queueMessage(ProtocolServerRequests.HISTORY_REQ(chatClient.getPartnerUsername()));
             }
         });

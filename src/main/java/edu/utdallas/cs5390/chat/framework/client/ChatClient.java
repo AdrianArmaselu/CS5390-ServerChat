@@ -1,11 +1,15 @@
 package edu.utdallas.cs5390.chat.framework.client;
 
+import edu.utdallas.cs5390.chat.framework.common.ContextValues;
 import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
-import edu.utdallas.cs5390.chat.framework.common.connection.udp.UDPConnection;
+import edu.utdallas.cs5390.chat.framework.common.connection.UdpConnection;
 import edu.utdallas.cs5390.chat.framework.common.service.TCPMessagingService;
 import edu.utdallas.cs5390.chat.framework.common.util.CLIReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -19,31 +23,49 @@ import java.util.Map;
 
 // TODO: COMMUNICATE AVAILABLE COMMANDS BACK TO THE USER
 public class ChatClient implements AbstractChatClient {
+    private final Logger logger = LoggerFactory.getLogger(ChatClient.class);
+
     private ChatClientArguments chatClientArguments;
-    private UDPConnection udpConnection;
+    private UdpConnection udpConnection;
     private CLIReader cliReader;
     private Map<String, ContextualProtocol> cliProtocols;
     private TCPMessagingService tcpMessagingService;
     private String partnerUsername;
-    private boolean isInChatSession;
+    private String sessionId;
 
     public ChatClient(ChatClientArguments chatClientArguments) throws IOException {
         tcpMessagingService = new TCPMessagingService();
+        tcpMessagingService.setOnChatMessageProtocol(new ContextualProtocol() {
+            @Override
+            public void executeProtocol() {
+                System.out.println(getContextValue(ContextValues.message));
+            }
+        });
         cliProtocols = new HashMap<>();
         this.chatClientArguments = chatClientArguments;
         cliReader = new CLIReader();
-        try {
-            udpConnection = new UDPConnection(chatClientArguments.getServerAddress(), chatClientArguments.getUdpClientPort(), chatClientArguments.getUdpServerPort());
-        } catch (SocketException | UnknownHostException e) {
-            e.printStackTrace();
-        }
+        boolean isRunning = true;
+        int port = 9000;
+        do
+            try {
+                DatagramSocket datagramSocket = new DatagramSocket(port++);
+                datagramSocket.setSoTimeout(1000);
+                udpConnection = new UdpConnection(chatClientArguments.getServerAddress(), chatClientArguments.getUdpServerPort());
+                isRunning = true;
+            } catch (SocketException | UnknownHostException e) {
+                if (e.getMessage().equals("Address already in use: Cannot bind")) {
+                    isRunning = false;
+                }else{
+                    e.printStackTrace();
+                }
+            }
+        while (!isRunning);
     }
 
     public void run() {
-        System.out.println("started client");
+        logger.info("started client");
         String message = "";
         while (!message.equals("exit")) {
-            System.out.println(message);
             message = cliReader.readInput();
             executeCommand(message);
         }
@@ -66,17 +88,29 @@ public class ChatClient implements AbstractChatClient {
     }
 
     @Override
-    public int getServerTcpPort() {
-        return chatClientArguments.getTcpPort();
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    @Override
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
     }
 
     private void executeCommand(String message) {
-        if(cliProtocols.containsKey(message))
+        String[] messageWords = message.split(" ");
+        boolean hasProtocolForMessageFirstWord = cliProtocols.containsKey(messageWords[0]);
+        if(hasProtocolForMessageFirstWord && messageWords.length > 1){
+            ContextualProtocol protocol = cliProtocols.get(messageWords[0]);
+            protocol.setContextValue(ContextValues.chatPartnerUsername, messageWords[1]);
+            protocol.executeProtocol();
+        }
+        else if (cliProtocols.containsKey(message))
             cliProtocols.get(message).executeProtocol();
         else if (!cliProtocols.containsKey(message) && isInChatSession())
             queueMessage(message);
         else if (!cliProtocols.containsKey(message) && !isInChatSession())
-            System.out.println("Command Not Recognized. Here is a list of available commands: <Needs development>"); // TODO: THIS SHOULD BE HANDLED FROM OUTSIDE
+            System.out.println("Command Not Recognized. Here is a list of available commands:[Log on, Log off, Chat <userid>, History, End Chat, Exit");
     }
 
     public void shutdown() {
@@ -95,37 +129,28 @@ public class ChatClient implements AbstractChatClient {
     }
 
     @Override
-    public void startTCPMessagingService(String serverAddress, int serverPort, Key secretKey) {
+    public void startTCPMessagingService(Key secretKey) {
         try {
-            tcpMessagingService.setup(new Socket(serverAddress, serverPort), secretKey);
+            logger.info("Started tcp messaging service");
+            tcpMessagingService.setup(new Socket(chatClientArguments.getServerAddress(), chatClientArguments.getTcpPort()), secretKey);
             tcpMessagingService.start();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public UDPConnection getUDPConnection() {
+    public UdpConnection getUDPConnection() {
         return udpConnection;
     }
 
     @Override
-    public void setIsInChatSession(boolean isInChatSession) {
-        this.isInChatSession = isInChatSession;
-    }
-
-    @Override
     public boolean isInChatSession() {
-        return isInChatSession;
+        return sessionId != null;
     }
 
     @Override
     public void queueMessage(String message) {
         tcpMessagingService.queueMessage(message);
-    }
-
-    @Override
-    public String readInput() {
-        return cliReader.readInput();
     }
 
     @Override
@@ -139,10 +164,5 @@ public class ChatClient implements AbstractChatClient {
 
     public String getPassword() {
         return chatClientArguments.getPassword();
-    }
-
-    @Override
-    public String getServerAddress() {
-        return chatClientArguments.getServerAddress();
     }
 }

@@ -1,57 +1,67 @@
 package edu.utdallas.cs5390.chat.impl.server;
 
 import com.beust.jcommander.JCommander;
-import edu.utdallas.cs5390.chat.framework.common.ContextValues;
-import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
-import edu.utdallas.cs5390.chat.framework.common.service.TCPMessagingService;
 import edu.utdallas.cs5390.chat.framework.common.util.CLIReader;
-import edu.utdallas.cs5390.chat.framework.common.util.Utils;
 import edu.utdallas.cs5390.chat.framework.server.AbstractChatServer;
 import edu.utdallas.cs5390.chat.framework.server.ChatServer;
 import edu.utdallas.cs5390.chat.framework.server.ChatServerArguments;
-import edu.utdallas.cs5390.chat.framework.server.service.ClientProfile;
-import edu.utdallas.cs5390.chat.framework.server.service.ServerUDPService;
+import edu.utdallas.cs5390.chat.impl.server.protocol.tcp.ConnectProtocol;
+import edu.utdallas.cs5390.chat.impl.server.protocol.tcp.EndRequestProtocol;
+import edu.utdallas.cs5390.chat.impl.server.protocol.tcp.HistoryRequestProtocol;
+import edu.utdallas.cs5390.chat.impl.server.protocol.udp.HelloProtocol;
+import edu.utdallas.cs5390.chat.impl.server.protocol.udp.RegisterProtocol;
+import edu.utdallas.cs5390.chat.impl.server.protocol.udp.ResponseProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.InetAddress;
-import java.security.InvalidKeyException;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 
 /**
  * Created by adisor on 11/20/2016.
  */
 
 // TODO: IF A MESSAGE NEEDS TO BE RETRANSMITTED, DO NOT RE-EXECUTE THE CODE
-
-//8080 - udp server, 8081 - udp client, 8082 - tcp 8083
+// TODO : DEBUG FOR MULTIPLE CLIENTS CONNECTED
+    // TODO: CHANGE THE WAY THE ENCRYPTION KEY IS CREATED, DO NOT TRANSPORT IT
+    // todo: handle people that try to login again with same credentials
+    // TODO: PROTOCOL EXECUTIONS ARE NOT ROBUST
+    //TRY CONNECTING TWO USERS AT THE SAME TIME
+//8080 - udp server, 8081 - tcp
 class ChatServerLauncher {
+    private final Logger logger = LoggerFactory.getLogger(ChatServerLauncher.class);
     private AbstractChatServer chatServer;
 
-    // TODO: CHANGE THIS TO CMD ARGUMENT
-    public static final int clientPort = 8081;
-
     private void run(String[] args) throws IOException {
+
+        logger.info("Starting Server... ");
+
         ChatServerArguments chatServerArguments = new ChatServerArguments();
         JCommander jCommander = new JCommander(chatServerArguments);
         jCommander.parse(args);
+        logger.info("Parsed Arguments");
+
         chatServer = new ChatServer(chatServerArguments);
+
         addCLIProtocols();
         addUdpProtocols();
         addTCPProtocols();
+
         //setup
         CLIReader cliReader = new CLIReader();
         String command = "";
         // startup
         chatServer.startup();
+        logger.info("Server Started");
+
         while (!command.equals("exit")) {
             command = cliReader.readInput();
         }
+
+        logger.info("Server is shutting down...");
+
         chatServer.shutdown();
+        logger.info("Server shutdown");
+
         System.exit(0);
     }
 
@@ -61,120 +71,27 @@ class ChatServerLauncher {
     }
 
     private void addCLIProtocols() {
+        logger.info("Added Command Line Protocols");
     }
 
     private void addUdpProtocols() {
-        chatServer.addUdpProtocol(ProtocolIncomingUdpMessages.HELLO, new ContextualProtocol() {
-            @Override
-            public void executeProtocol() {
-                DatagramPacket datagramPacket = (DatagramPacket) getContextValue(ContextValues.packet);
-                String message = Utils.extractMessage(datagramPacket);
-                String username = Utils.extractValue(message);
-                String clientIp = datagramPacket.getAddress().getHostAddress();
-                if (chatServer.isASubscriber(username)) {
-                    ClientProfile clientProfile = chatServer.getProfileByUsername(username);
-                    chatServer.addIpProfile(clientIp, clientProfile);
-                    clientProfile.rand = Utils.randomString(4);
-                    try {
-                        ServerUDPService serverUDPService = chatServer.getUdpService();
-                        serverUDPService.sendMessage(ProtocolOutgoingMessages.CHALLENGE(clientProfile.rand), InetAddress.getByName(clientIp), clientPort);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        });
-
-        chatServer.addUdpProtocol(ProtocolIncomingUdpMessages.RESPONSE, new ContextualProtocol() {
-            @Override
-            public void executeProtocol() {
-                DatagramPacket datagramPacket = (DatagramPacket) getContextValue(ContextValues.packet);
-                String message = Utils.extractMessage(datagramPacket);
-                String clientRes = Utils.extractValue(message);
-                String clientIp = datagramPacket.getAddress().getHostAddress();
-                ClientProfile clientProfile = chatServer.getProfileByIp(clientIp);
-                try {
-                    String serverRes = Utils.createCipherKey(clientProfile.rand, clientProfile.password);
-                    System.out.println("Created server res " + serverRes);
-                    Key encryptionKey = Utils.createEncryptionKey(serverRes);
-                    ServerUDPService serverUDPService = chatServer.getUdpService();
-                    System.out.println("res match: " + serverRes + " " + clientRes);
-                    boolean authenticationCodesMatch = clientRes.equals(serverRes);
-                    if (authenticationCodesMatch) {
-                        serverUDPService.sendEncryptedMessage(ProtocolOutgoingMessages.AUTH_SUCCESS, InetAddress.getByName(clientIp), clientPort, encryptionKey);
-                    } else {
-                        serverUDPService.sendEncryptedMessage(ProtocolOutgoingMessages.AUTH_FAIL, InetAddress.getByName(clientIp), clientPort, encryptionKey);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-
-        chatServer.addUdpProtocol(ProtocolIncomingUdpMessages.REGISTER, new ContextualProtocol() {
-            @Override
-            public void executeProtocol() {
-                DatagramPacket datagramPacket = (DatagramPacket) getContextValue(ContextValues.packet);
-                String clientIp = datagramPacket.getAddress().getHostAddress();
-                ClientProfile clientProfile = chatServer.getProfileByIp(clientIp);
-                clientProfile.isRegistered = true;
-                ServerUDPService serverUDPService = chatServer.getUdpService();
-                try {
-                    serverUDPService.sendEncryptedMessage(
-                            ProtocolOutgoingMessages.AUTH_SUCCESS,
-                            InetAddress.getByName(clientIp),
-                            clientPort,
-                            clientProfile.encryptionKey
-                    );
-                } catch (IllegalBlockSizeException | NoSuchAlgorithmException | BadPaddingException | IOException | InvalidKeyException | NoSuchPaddingException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+        HelloProtocol helloProtocol = new HelloProtocol();
+        helloProtocol.setChatServer(chatServer);
+        ResponseProtocol responseProtocol = new ResponseProtocol();
+        responseProtocol.setChatServer(chatServer);
+        RegisterProtocol registerProtocol = new RegisterProtocol();
+        registerProtocol.setChatServer(chatServer);
+        chatServer.addUdpProtocol(ProtocolIncomingUdpMessages.HELLO, helloProtocol);
+        chatServer.addUdpProtocol(ProtocolIncomingUdpMessages.RESPONSE, responseProtocol);
+        chatServer.addUdpProtocol(ProtocolIncomingUdpMessages.REGISTER, registerProtocol);
+        logger.info("Added Udp Protocols");
     }
 
     private void addTCPProtocols() {
-        chatServer.addTcpProtocol(ProtocolIncomingTcpMessages.CONNECT, new ContextualProtocol() {
-            @Override
-            public void executeProtocol() {
-                TCPMessagingService tcpMessagingService = (TCPMessagingService) getContextValue(ContextValues.tcpMessagingService);
-                ClientProfile clientProfile = (ClientProfile) getContextValue(ContextValues.clientProfile);
-                String message = (String) getContextValue(ContextValues.message);
-                String targetUsername = Utils.extractValue(message);
-                ClientProfile targetProfile = chatServer.getProfileByUsername(targetUsername);
-                if (targetProfile.isRegistered && !targetProfile.inSession) {
-                    String sessionId = Utils.UUID();
-                    TCPMessagingService targetMessagingService = chatServer.getTcpMessagingService(targetUsername);
-                    tcpMessagingService.queueMessage(ProtocolOutgoingMessages.START(sessionId, targetProfile.username));
-                    targetMessagingService.queueMessage(ProtocolOutgoingMessages.START(sessionId, clientProfile.username));
-                } else {
-                    tcpMessagingService.queueMessage(ProtocolOutgoingMessages.UNREACHABLE(targetProfile.username));
-                }
-            }
-        });
-
-        chatServer.addTcpProtocol(ProtocolIncomingTcpMessages.HISTORY_REQ, new ContextualProtocol() {
-            @Override
-            public void executeProtocol() {
-                TCPMessagingService tcpMessagingService = (TCPMessagingService) getContextValue(ContextValues.tcpMessagingService);
-                ClientProfile clientProfile = (ClientProfile) getContextValue(ContextValues.clientProfile);
-                tcpMessagingService.queueMessage(clientProfile.getHistory());
-            }
-        });
-
-        chatServer.addTcpProtocol(ProtocolIncomingTcpMessages.END_REQUEST, new ContextualProtocol() {
-            @Override
-            public void executeProtocol() {
-                // need to init this
-                String partnerUsername = "";
-                TCPMessagingService tcpMessagingService = (TCPMessagingService) getContextValue(ContextValues.tcpMessagingService);
-                ClientProfile clientProfile = (ClientProfile) getContextValue(ContextValues.clientProfile);
-                String sessionId = clientProfile.sessionId;
-                TCPMessagingService targetMessagingService = chatServer.getTcpMessagingService(partnerUsername);
-                tcpMessagingService.queueMessage(ProtocolOutgoingMessages.END_NOTIF(sessionId));
-                targetMessagingService.queueMessage(ProtocolOutgoingMessages.END_NOTIF(sessionId));
-            }
-        });
+        chatServer.addTcpProtocol(ProtocolIncomingTcpMessages.CONNECT, new ConnectProtocol());
+        chatServer.addTcpProtocol(ProtocolIncomingTcpMessages.HISTORY_REQ, new HistoryRequestProtocol());
+        chatServer.addTcpProtocol(ProtocolIncomingTcpMessages.END_REQUEST, new EndRequestProtocol());
+        logger.info("Added Tcp Protocols");
     }
 
     public static void main(String[] args) {
@@ -185,5 +102,4 @@ class ChatServerLauncher {
             chatServerLauncher.printUsage();
         }
     }
-
 }
