@@ -15,40 +15,45 @@ import java.util.Arrays;
 // TODO: SERVERS DO NOT HAVE RECEIVE TIMEOUT
 public class UdpConnection extends AbstractConnection {
     private static final Logger logger = LoggerFactory.getLogger(UdpConnection.class);
-    private static final int PACKET_BUFFER_SIZE = 128;
+    private static final int PACKET_BUFFER_SIZE = 1024;
     private DatagramSocket datagramSocket;
-    private String destinationAddress;
+    private String destinationIpAddress;
     private int destinationPort;
     private Key senderEncryptionKey;
     private Key receiverEncryptionKey;
 
     // used to create a new connection but reuse the listener socket
-    public UdpConnection(DatagramSocket datagramSocket, String destinationAddress, int destinationPort) throws UnknownHostException, SocketException {
+    public UdpConnection(DatagramSocket datagramSocket, String destinationIpAddress, int destinationPort) throws UnknownHostException, SocketException {
         this(datagramSocket);
-        this.destinationAddress = destinationAddress;
+        this.destinationIpAddress = destinationIpAddress;
         this.destinationPort = destinationPort;
+        logger.debug("Udp connection created with ip address " + destinationIpAddress + " and destination port " + destinationPort);
     }
 
     // used solely as a listener
     public UdpConnection(DatagramSocket datagramSocket) throws UnknownHostException, SocketException {
+        logger.debug("Creating udp connection with datagram socket " + datagramSocket);
         this.datagramSocket = datagramSocket;
     }
 
     // used when you do not care about on which port to listen but want to communicate with a specific destination
-    public UdpConnection(String destinationAddress, int destinationPort) throws UnknownHostException, SocketException {
+    public UdpConnection(String destinationIpAddress, int destinationPort) throws UnknownHostException, SocketException {
         this();
-        this.destinationAddress = destinationAddress;
+        this.destinationIpAddress = destinationIpAddress;
         this.destinationPort = destinationPort;
+        logger.debug("Udp connection created with ip address " + destinationIpAddress + " and destination port " + destinationPort);
     }
 
     public UdpConnection() throws UnknownHostException, SocketException {
+        logger.debug("Creating udp connection with datagram socket " + datagramSocket);
         datagramSocket = new DatagramSocket();
         datagramSocket.setSoTimeout(RECEIVE_TIMEOUT);
     }
 
-    public void addEncryption(Key encryptionKey){
+    public void addEncryption(Key encryptionKey) {
         addSenderEncryption(encryptionKey);
         addReceiverEncryption(encryptionKey);
+        logger.debug("added encryption to both sender and receiver");
     }
 
     public void addSenderEncryption(Key encryptionKey) {
@@ -59,13 +64,13 @@ public class UdpConnection extends AbstractConnection {
         receiverEncryptionKey = encryptionKey;
     }
 
-    public void setDestination(String destinationAddress, int destinationPort){
-        setDestinationAddress(destinationAddress);
+    public void setDestination(String destinationAddress, int destinationPort) {
+        setDestinationIpAddress(destinationAddress);
         setDestinationPort(destinationPort);
     }
 
-    public void setDestinationAddress(String destinationAddress) {
-        this.destinationAddress = destinationAddress;
+    public void setDestinationIpAddress(String destinationIpAddress) {
+        this.destinationIpAddress = destinationIpAddress;
     }
 
     public void setDestinationPort(int destinationPort) {
@@ -74,11 +79,15 @@ public class UdpConnection extends AbstractConnection {
 
     @Override
     public void sendMessage(String message) throws Exception {
+        logger.debug("Sending message " + message);
+        logger.debug("Creating chat packet with encryption key " + senderEncryptionKey);
         ChatPacket chatPacket = new ChatPacket(message, senderEncryptionKey);
-        DatagramPacket datagramPacket = new DatagramPacket(chatPacket.getData(), chatPacket.getData().length, InetAddress.getByName(destinationAddress), destinationPort); // TODO : THIS COULD BE MORE EFFICIENT
+        logger.debug("Chat packet created");
+        DatagramPacket datagramPacket = new DatagramPacket(chatPacket.getData(), chatPacket.getData().length, InetAddress.getByName(destinationIpAddress), destinationPort); // TODO : THIS COULD BE MORE EFFICIENT
+        logger.debug("Created datagram packet with the chat packet data");
         logger.debug(
                 String.format("Sending udp packet to %s:%d with string: %s ; bytes: %s. Has encryption flag %b",
-                        destinationAddress,
+                        destinationIpAddress,
                         destinationPort,
                         message,
                         Arrays.toString(datagramPacket.getData()),
@@ -86,6 +95,7 @@ public class UdpConnection extends AbstractConnection {
                 )
         );
         datagramSocket.send(datagramPacket);
+        logger.debug("datagram packet sent");
     }
 
     public DatagramPacket receivePacket() throws IOException { // TODO: CAN CHANGE TO FIRST GET THE SIZE OF THE MESSAGE, AND THEN ACTUALLY RECEIVE THE MESSAGE
@@ -114,11 +124,20 @@ public class UdpConnection extends AbstractConnection {
         datagramSocket.close();
     }
 
+    @Override
     public String getDestinationAddress() {
-        return destinationAddress;
+        return getIpAddress() + ":" + getDestinationPort();
+    }
+
+    public String getIpAddress() {
+        return destinationIpAddress;
     }
 
     public int getDestinationPort() {
         return destinationPort;
+    }
+
+    public int getPort() {
+        return datagramSocket.getLocalPort();
     }
 }

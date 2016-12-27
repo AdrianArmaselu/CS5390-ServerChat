@@ -8,3 +8,6 @@ Issues I found:
 1. I needed to find a way to better communicate through UDP because just having a large buffer did not cut it
 2. I needed to find  a way to design and separate components to make modifications and find errors easily
 3. had issues with transmitting historyMessage: string vs byte array when encrypting
+4. If two users connect via tcp at the same time, how to differentiate?
+Added functionality to send large messages by splitting the message into multiple packets
+Talk about the extra features

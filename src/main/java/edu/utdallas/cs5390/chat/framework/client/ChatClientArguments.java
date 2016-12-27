@@ -13,7 +13,7 @@ public class ChatClientArguments {
     @Parameter(names = "-tcpport", required = true, description = "port to listen for incoming data for tcp")
     private int tcpPort;
 
-    @Parameter(names = "-udpportserver", required = true, description = "the udp port of the server")
+    @Parameter(names = "-udpport", required = true, description = "the udp port of the server")
     private int udpServerPort;
 
     @Parameter(names = "-user", required = true, description = "username/userid")

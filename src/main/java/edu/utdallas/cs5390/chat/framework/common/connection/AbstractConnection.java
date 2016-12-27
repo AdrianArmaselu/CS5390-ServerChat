@@ -21,15 +21,20 @@ public abstract class AbstractConnection {
         String response;
         int retries = 0;
         do {
+            logger.debug("Attempting to transmit message. Attempts remaining: " + (MAX_RETRIES - retries));
             retries++;
             try {
                 sendMessage(message);
+                logger.debug("Transmitted message successfully");
+                logger.debug("Waiting to receive response");
                 response = receiveMessage();
+                logger.debug("Received response successfully");
             } catch (Exception e) {
-                if(e.getMessage().equals("Receive timed out"))
+                logger.debug("Either message was not transmitted or no response received. Reason is " + e.getMessage());
+                if (e.getMessage().equals("Receive timed out"))
                     logger.warn(e.getMessage());
                 else
-                    e.printStackTrace();
+                    logger.error(e.getMessage(), e);
                 response = null;
             }
         } while (response == null && retries < MAX_RETRIES);
@@ -42,4 +47,8 @@ public abstract class AbstractConnection {
     public abstract String receiveMessage() throws Exception;
 
     public abstract void close();
+
+    public abstract String getDestinationAddress();
+
+    public abstract String getIpAddress();
 }

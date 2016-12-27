@@ -1,168 +1,263 @@
 package edu.utdallas.cs5390.chat.framework.client;
 
-import edu.utdallas.cs5390.chat.framework.common.ContextValues;
-import edu.utdallas.cs5390.chat.framework.common.ContextualProtocol;
+import com.beust.jcommander.JCommander;
+import edu.utdallas.cs5390.chat.framework.common.connection.EncryptedTcpConnection;
 import edu.utdallas.cs5390.chat.framework.common.connection.UdpConnection;
-import edu.utdallas.cs5390.chat.framework.common.service.TCPMessagingService;
+import edu.utdallas.cs5390.chat.framework.common.service.MessagingService;
 import edu.utdallas.cs5390.chat.framework.common.util.CLIReader;
+import edu.utdallas.cs5390.chat.framework.common.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
 import java.net.Socket;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.security.Key;
-import java.util.HashMap;
-import java.util.Map;
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Created by Adisor on 10/1/2016.
  */
-
-// TODO: COMMUNICATE AVAILABLE COMMANDS BACK TO THE USER
-public class ChatClient implements AbstractChatClient {
+public class ChatClient {
     private final Logger logger = LoggerFactory.getLogger(ChatClient.class);
-
-    private ChatClientArguments chatClientArguments;
     private UdpConnection udpConnection;
     private CLIReader cliReader;
-    private Map<String, ContextualProtocol> cliProtocols;
-    private TCPMessagingService tcpMessagingService;
-    private String partnerUsername;
+    private String username;
+    private String password;
+    private String serverIpAddress;
+    private int tcpPort;
+    private MessagingService tcpMessagingService;
     private String sessionId;
+    private String corespondent;
+    private boolean isRegistered;
 
-    public ChatClient(ChatClientArguments chatClientArguments) throws IOException {
-        tcpMessagingService = new TCPMessagingService();
-        tcpMessagingService.setOnChatMessageProtocol(new ContextualProtocol() {
-            @Override
-            public void executeProtocol() {
-                System.out.println(getContextValue(ContextValues.message));
-            }
-        });
-        cliProtocols = new HashMap<>();
-        this.chatClientArguments = chatClientArguments;
+    private ChatClient(ChatClientArguments chatClientArguments) throws IOException {
+        username = chatClientArguments.getUsername();
+        password = chatClientArguments.getPassword();
+        serverIpAddress = chatClientArguments.getServerAddress();
+        tcpPort = chatClientArguments.getTcpPort();
+        udpConnection = new UdpConnection(chatClientArguments.getServerAddress(), chatClientArguments.getUdpServerPort());
+
         cliReader = new CLIReader();
-        boolean isRunning = true;
-        int port = 9000;
-        do
-            try {
-                DatagramSocket datagramSocket = new DatagramSocket(port++);
-                datagramSocket.setSoTimeout(1000);
-                udpConnection = new UdpConnection(chatClientArguments.getServerAddress(), chatClientArguments.getUdpServerPort());
-                isRunning = true;
-            } catch (SocketException | UnknownHostException e) {
-                if (e.getMessage().equals("Address already in use: Cannot bind")) {
-                    isRunning = false;
-                }else{
-                    e.printStackTrace();
-                }
-            }
-        while (!isRunning);
     }
 
-    public void run() {
+    private void run() {
         logger.info("started client");
         String message = "";
-        while (!message.equals("exit")) {
-            message = cliReader.readInput();
-            executeCommand(message);
-        }
-        shutdown();
-    }
-
-    @Override
-    public void addCliProtocol(String command, ContextualProtocol cliProtocol) {
-        cliProtocols.put(command, cliProtocol);
-    }
-
-    @Override
-    public String getPartnerUsername() {
-        return partnerUsername;
-    }
-
-    @Override
-    public void setPartnerUsername(String partnerUsername) {
-        this.partnerUsername = partnerUsername;
-    }
-
-    @Override
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    @Override
-    public void setSessionId(String sessionId) {
-        this.sessionId = sessionId;
+        while (!message.equals("exit"))
+            executeCommand(message = cliReader.readInput());
     }
 
     private void executeCommand(String message) {
-        String[] messageWords = message.split(" ");
-        boolean hasProtocolForMessageFirstWord = cliProtocols.containsKey(messageWords[0]);
-        if(hasProtocolForMessageFirstWord && messageWords.length > 1){
-            ContextualProtocol protocol = cliProtocols.get(messageWords[0]);
-            protocol.setContextValue(ContextValues.chatPartnerUsername, messageWords[1]);
-            protocol.executeProtocol();
+        if (message.isEmpty()) return;
+        if (message.startsWith("Log on") && !isRegistered) { // if a message times out, need to have a mechanism to keep track of that
+            try {
+                String helloRequest = "HELLO(" + username + ")";
+
+                logger.info("Sending hello request to the server and waiting response...");
+                String serverResponse = udpConnection.sendMessageAndGetResponse(helloRequest);
+
+                String rand = Utils.extractValue(serverResponse);
+                String res = Utils.createCipherKey(rand, password);
+                Key encryptionKey = Utils.createEncryptionKey(res);
+                String responseRequest = "RESPONSE(" + res + ")";
+                udpConnection.addReceiverEncryption(encryptionKey);
+
+                logger.info("Sending response request to the server and waiting response...");
+                serverResponse = udpConnection.sendMessageAndGetResponse(responseRequest);
+
+                if (serverResponse.equals("AUTH_SUCCESS")) {
+                    logger.info("Authentication was successful");
+
+                    Socket tcpSocket = new Socket(serverIpAddress, tcpPort);
+                    logger.debug("Created tcp socket");
+
+                    EncryptedTcpConnection encryptedTcpConnection = new EncryptedTcpConnection(tcpSocket, encryptionKey);
+                    logger.debug("created encrypted tcp connection");
+
+                    tcpMessagingService = new TcpService();
+                    tcpMessagingService.setConnection(encryptedTcpConnection);
+                    encryptedTcpConnection.disableEncryption();
+
+                    logger.debug("Sending message with udp port...");
+                    tcpMessagingService.queueMessage(String.valueOf(udpConnection.getPort()));
+
+                    logger.debug("Starting tcp messaging service...");
+                    tcpMessagingService.start();
+
+                    logger.debug("Waiting for the port message to be transmitted...");
+                    encryptedTcpConnection.enableReceiverEncryption();
+                    while (!tcpMessagingService.areMessagesSent()) {
+                        try {
+                            Thread.sleep(10);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    logger.debug("Port message has been transmitted");
+                    encryptedTcpConnection.enableEncryption();
+                } else
+                    logger.info("Authentication was unsuccessful");
+                logger.info("Client is now registered");
+            } catch (TimeoutException | NoSuchAlgorithmException | IOException e) {
+                if (e.getMessage().equals("Server either refused to respond or is unreachable"))
+                    System.out.println("Server is down");
+                else
+                    logger.error(e.getMessage(), e);
+            }
+        } else if (message.startsWith("Log on") && isRegistered) {
+            System.out.println("You are already logged in");
         }
-        else if (cliProtocols.containsKey(message))
-            cliProtocols.get(message).executeProtocol();
-        else if (!cliProtocols.containsKey(message) && isInChatSession())
-            queueMessage(message);
-        else if (!cliProtocols.containsKey(message) && !isInChatSession())
-            System.out.println("Command Not Recognized. Here is a list of available commands:[Log on, Log off, Chat <userid>, History, End Chat, Exit");
+        if (isRegistered) {
+            if (message.startsWith("Chat") && !isInChatSession()) { // has to wait before receiving response
+                String[] values = message.split(" ");
+                if (values.length < 2) {
+                    System.out.println("No corespondent specified.");
+                    return;
+                }
+                corespondent = message.split(" ")[1];
+                tcpMessagingService.queueMessage("CONNECT(" + corespondent + ")");
+                waitForTcpResponse();
+            } else if (message.startsWith("Chat") && isInChatSession())
+                System.out.println("Already in a chat session. Exit current session first.");
+
+            if (message.startsWith("History")) {
+                String[] values = message.split(" ");
+                if (values.length < 2) {
+                    System.out.println("No corespondent specified.");
+                    return;
+                }
+                String historyCorespondent = message.split(" ")[1];
+                tcpMessagingService.queueMessage("HISTORY_REQ(" + historyCorespondent + ")");
+            }
+
+            if (message.startsWith("End chat") && isInChatSession()) {
+                tcpMessagingService.queueMessage("END_NOTIF(" + sessionId + ")");
+                corespondent = null;
+                sessionId = null;
+            } else if (message.startsWith("End chat") && !isInChatSession()) {
+                System.out.println("You are not in a chat session to end it.");
+            }
+
+            if (message.startsWith("Log off")) {
+                isRegistered = false;
+                corespondent = null;
+                sessionId = null;
+                tcpMessagingService.shutdown();
+                System.out.println("Logged off.");
+            }
+        } else if (message.startsWith("Chat") || message.startsWith("History") || message.startsWith("End chat") || message.startsWith("Log off")) {
+            System.out.println("Cannot perform command. Must be registered.");
+        }
+
+        if (message.startsWith("Exit"))
+            shutdown();
+
+        if (message.startsWith("help"))
+            System.out.println("Here is a list of available commands:[Log on, Log off, Chat <userid>, History, End Chat, Exit");
+
+        String[] commands = new String[]{"Exit", "help", "Log on", "Log off", "Chat", "History", "End chat"};
+        boolean isCommand = false;
+        for (String command : commands) {
+            if (message.startsWith(command)) {
+                isCommand = true;
+                break;
+            }
+        }
+        if (!isCommand && isInChatSession() && isRegistered) {
+            tcpMessagingService.queueMessage("CHAT(" + sessionId + "," + message + ")");
+        }
     }
 
-    public void shutdown() {
-        if (tcpMessagingService != null)
-            tcpMessagingService.shutdown();
-        if (udpConnection != null)
-            udpConnection.close();
+    private void waitForTcpResponse() {
+        logger.info("Waiting for server to respond to tcp request");
+        synchronized (tcpMessagingService) {
+            try {
+                tcpMessagingService.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        logger.info("Server responded");
+    }
+
+    private void shutdown() {
+        logger.info("Shutting down the chat client...");
         if (cliReader != null)
             cliReader.close();
+        logger.info("Shutting down tcp messaging service...");
+        if (tcpMessagingService != null)
+            tcpMessagingService.shutdown();
+        logger.info("Shutting down udp connection...");
+        if (udpConnection != null)
+            udpConnection.close();
+        logger.info("Exiting...");
         System.exit(0);
     }
 
-    @Override
-    public void addTCPProtocol(String serverResponse, ContextualProtocol responseProtocol) {
-        tcpMessagingService.addProtocol(serverResponse, responseProtocol);
-    }
-
-    @Override
-    public void startTCPMessagingService(Key secretKey) {
-        try {
-            logger.info("Started tcp messaging service");
-            tcpMessagingService.setup(new Socket(chatClientArguments.getServerAddress(), chatClientArguments.getTcpPort()), secretKey);
-            tcpMessagingService.start();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public UdpConnection getUDPConnection() {
-        return udpConnection;
-    }
-
-    @Override
-    public boolean isInChatSession() {
+    private boolean isInChatSession() {
         return sessionId != null;
     }
 
-    @Override
-    public void queueMessage(String message) {
-        tcpMessagingService.queueMessage(message);
+    private class TcpService extends MessagingService {
+
+        TcpService() {
+            super();
+        }
+
+        @Override
+        protected void processNextMessage() throws Exception {
+            try {
+                String message = retrieveMessage();
+                if (message.startsWith("REGISTERED")) {
+                    System.out.println("Online");
+                    isRegistered = true;
+                } else if (message.startsWith("START")) {
+                    List<String> values = Utils.extractValues(message);
+                    sessionId = values.get(0);
+                    corespondent = values.get(1);
+                    System.out.println("Chat started");
+                } else if (message.startsWith("UNREACHABLE")) {
+                    corespondent = null;
+                    System.out.println("Correspondent unreachable");
+                } else if (message.startsWith("END_NOTIF")) {
+                    sessionId = null;
+                    corespondent = null;
+                    System.out.println("Chat ended");
+                } else if (message.startsWith("CHAT") || message.startsWith("HISTORY_RESP")) {
+                    List<String> values = Utils.extractValues(message);
+                    System.out.println(values.get(1));
+                }
+            } catch (Exception e) {
+                if (e.getMessage().equals("Connection reset")) {
+                    sessionId = null;
+                    corespondent = null;
+                    isRegistered = false;
+                }
+                throw new Exception(e.getMessage(), e);
+            } finally {
+                synchronized (this) {
+                    notifyAll();
+                }
+            }
+        }
     }
 
-    @Override
-    public void logoff() {
-        tcpMessagingService.shutdown();
-    }
-
-    public String getUsername() {
-        return chatClientArguments.getUsername();
-    }
-
-    public String getPassword() {
-        return chatClientArguments.getPassword();
+    public static void main(String[] args) {
+        ChatClientArguments chatClientArguments = new ChatClientArguments();
+        JCommander jCommander = new JCommander(chatClientArguments);
+        try {
+            jCommander.parse(args);
+        } catch (Exception ignored) {
+            jCommander.usage();
+            System.exit(0);
+        }
+        try {
+            ChatClient chatClient = new ChatClient(chatClientArguments);
+            chatClient.run();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

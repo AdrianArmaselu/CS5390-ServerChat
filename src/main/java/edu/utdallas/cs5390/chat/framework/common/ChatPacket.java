@@ -79,7 +79,7 @@ public class ChatPacket {
 
     public String getMessage(Key encryptionKey) throws NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, NoSuchPaddingException, IllegalBlockSizeException {
         if (isEncrypted) {
-            if(encryptionKey == null) throw new IllegalArgumentException("Reading the message requires decryption, but now encryption key is provided");
+            if(encryptionKey == null) throw new IllegalArgumentException("Reading the message requires decryption, but no encryption key is provided");
             return new String(decryptMessage(message, encryptionKey));
         } else
             return new String(message);

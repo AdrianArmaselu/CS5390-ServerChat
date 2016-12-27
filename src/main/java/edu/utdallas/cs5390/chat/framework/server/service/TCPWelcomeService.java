@@ -1,7 +1,6 @@
 package edu.utdallas.cs5390.chat.framework.server.service;
 
 import edu.utdallas.cs5390.chat.framework.common.util.Utils;
-import edu.utdallas.cs5390.chat.framework.server.AbstractChatServer;
 import edu.utdallas.cs5390.chat.framework.server.ChatServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +16,7 @@ import java.net.Socket;
 public class TCPWelcomeService extends Thread {
     private final Logger logger = LoggerFactory.getLogger(TCPWelcomeService.class);
     private static final int SOCKET_WAIT_TIMEOUT = Utils.seconds(1);
-    private AbstractChatServer chatServer;
+    private ChatServer chatServer;
     private ServerSocket serverSocket;
 
     public TCPWelcomeService(ChatServer chatServer, int port) throws IOException {

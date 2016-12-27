@@ -1,5 +1,8 @@
 apply plugin: 'java'
+apply plugin: 'application'
 
+//mainClassName = "edu.utdallas.cs5390.chat.framework.client.ChatClient"
+mainClassName = "edu.utdallas.cs5390.chat.framework.server.ChatServer"
 repositories {
     mavenCentral()
 }
@@ -8,8 +11,6 @@ dependencies {
     compile group: 'com.beust', name: 'jcommander', version: '1.58'
     compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.5'
     compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.21'
-
-
 }
 
 sourceSets {

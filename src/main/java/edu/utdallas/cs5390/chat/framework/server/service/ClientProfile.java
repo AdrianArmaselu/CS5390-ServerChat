@@ -1,6 +1,9 @@
 package edu.utdallas.cs5390.chat.framework.server.service;
 
+import edu.utdallas.cs5390.chat.framework.common.util.Utils;
+
 import java.security.Key;
+import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -11,13 +14,11 @@ public class ClientProfile {
     public String username;
     public String password;
     public boolean isRegistered;
-    public boolean isConnected;
-    public String cipherKey;
+    public String xRes;
     public Key encryptionKey;
     public List<HistoryMessage> chatHistory;
     public boolean inSession;
     public String sessionId;
-    public String partner;
 
     public ClientProfile() {
         chatHistory = new LinkedList<>();
@@ -41,5 +42,22 @@ public class ClientProfile {
 
         );
         return stringBuilder.toString();
+    }
+
+    public void createXRes(String rand) throws NoSuchAlgorithmException {
+        xRes = Utils.createCipherKey(rand, password);
+    }
+
+    public void createEncryptionKey() {
+        encryptionKey = Utils.createEncryptionKey(xRes);
+    }
+
+    public void reset() {
+        isRegistered = false;
+        xRes = null;
+        encryptionKey = null;
+        chatHistory = null;
+        inSession = false;
+        sessionId = null;
     }
 }
